@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "SchoolInfo": {
+      "title": "SchoolInfo",
+      "description": "Informasi profil lembaga sekolah, kepala sekolah, dan periode semester rapor",
+      "type": "object",
+      "properties": {
+        "namaSekolah": { "type": "string" },
+        "npsn": { "type": "string" },
+        "alamat": { "type": "string" },
+        "kabupatenKota": { "type": "string" },
+        "provinsi": { "type": "string" },
+        "namaKepalaSekolah": { "type": "string" },
+        "nipKepalaSekolah": { "type": "string" },
+        "semester": { "type": "string" },
+        "tahunAjaran": { "type": "string" },
+        "tempatTanggalRapor": { "type": "string" },
+        "jenisRapor": { "type": "string" },
+        "kurikulum": { "type": "string" },
+        "logoSekolah": { "type": "string" },
+        "logoKabupaten": { "type": "string" },
+        "tampilkanFormatif": { "type": "boolean" },
+        "tampilkanSumatif": { "type": "boolean" }
+      },
+      "required": ["namaSekolah", "semester", "tahunAjaran", "tempatTanggalRapor"]
+    },
+    "Guru": {
+      "title": "Guru",
+      "description": "Data tenaga pendidik / guru pengampu dan wali kelas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "nip": { "type": "string" },
+        "jenisKelamin": { "type": "string", "enum": ["L", "P"] },
+        "noHp": { "type": "string" }
+      },
+      "required": ["id", "nama"]
+    },
+    "Kelas": {
+      "title": "Kelas",
+      "description": "Data rombongan belajar kelas dan wali kelas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "tingkat": { "type": "string" },
+        "waliKelas": { "type": "string" },
+        "nipWaliKelas": { "type": "string" }
+      },
+      "required": ["id", "nama"]
+    },
+    "MataPelajaran": {
+      "title": "MataPelajaran",
+      "description": "Struktur kurikulum mata pelajaran",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kode": { "type": "string" },
+        "nama": { "type": "string" },
+        "kelompok": { "type": "string" },
+        "urutan": { "type": "number" }
+      },
+      "required": ["id", "kode", "nama", "urutan"]
+    },
+    "Siswa": {
+      "title": "Siswa",
+      "description": "Data peserta didik",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nis": { "type": "string" },
+        "nisn": { "type": "string" },
+        "nama": { "type": "string" },
+        "jenisKelamin": { "type": "string", "enum": ["L", "P"] },
+        "kelasId": { "type": "string" }
+      },
+      "required": ["id", "nis", "nama", "kelasId"]
+    },
+    "SubjectConfig": {
+      "title": "SubjectConfig",
+      "description": "Konfigurasi pembelajaran KKTP dan bobot per kelas dan mata pelajaran",
+      "type": "object",
+      "properties": {
+        "kelasId": { "type": "string" },
+        "mapelId": { "type": "string" },
+        "namaGuru": { "type": "string" },
+        "kktp": { "type": "number" },
+        "bobotFormatif": { "type": "number" },
+        "bobotSumatif": { "type": "number" },
+        "deskripsiMapel": { "type": "string" }
+      },
+      "required": ["kelasId", "mapelId", "kktp"]
+    },
+    "NilaiRecord": {
+      "title": "NilaiRecord",
+      "description": "Rekam nilai formatif, sumatif, akhir, dan deskripsi capaian siswa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siswaId": { "type": "string" },
+        "mapelId": { "type": "string" },
+        "kelasId": { "type": "string" },
+        "nilaiFormatif": { "type": "number" },
+        "nilaiSumatif": { "type": "number" },
+        "nilaiAkhir": { "type": "number" },
+        "capaianKompetensi": { "type": "string" }
+      },
+      "required": ["id", "siswaId", "mapelId", "kelasId", "nilaiAkhir"]
+    },
+    "PresensiCatatan": {
+      "title": "PresensiCatatan",
+      "description": "Catatan ketidakhadiran dan motivasi wali kelas untuk siswa",
+      "type": "object",
+      "properties": {
+        "siswaId": { "type": "string" },
+        "kelasId": { "type": "string" },
+        "sakit": { "type": "number" },
+        "izin": { "type": "number" },
+        "alpa": { "type": "number" },
+        "catatanWaliKelas": { "type": "string" }
+      },
+      "required": ["siswaId", "kelasId"]
+    }
+  },
+  "firestore": {
+    "/schoolInfo/{schoolId}": {
+      "schema": { "$ref": "#/entities/SchoolInfo" },
+      "description": "Informasi profil dan pengaturan sekolah"
+    },
+    "/gurus/{guruId}": {
+      "schema": { "$ref": "#/entities/Guru" },
+      "description": "Daftar guru pendidik"
+    },
+    "/kelas/{kelasId}": {
+      "schema": { "$ref": "#/entities/Kelas" },
+      "description": "Daftar rombel kelas"
+    },
+    "/mapel/{mapelId}": {
+      "schema": { "$ref": "#/entities/MataPelajaran" },
+      "description": "Daftar mata pelajaran"
+    },
+    "/siswa/{siswaId}": {
+      "schema": { "$ref": "#/entities/Siswa" },
+      "description": "Daftar peserta didik"
+    },
+    "/subjectConfigs/{configId}": {
+      "schema": { "$ref": "#/entities/SubjectConfig" },
+      "description": "Konfigurasi KKTP dan guru per mapel & kelas"
+    },
+    "/scores/{scoreId}": {
+      "schema": { "$ref": "#/entities/NilaiRecord" },
+      "description": "Nilai formatif dan sumatif siswa"
+    },
+    "/presensi/{presensiId}": {
+      "schema": { "$ref": "#/entities/PresensiCatatan" },
+      "description": "Presensi dan catatan wali kelas"
+    }
+  }
+}

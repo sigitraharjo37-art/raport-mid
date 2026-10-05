@@ -1,0 +1,6 @@
+{
+  "name": "e-Rapor Tengah Semester (PTS/STS)",
+  "description": "Aplikasi Rapor Tengah Semester lengkap dengan input nilai, rekap otomatis, buku legger nilai & peringkat, serta ekspor PDF dan Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
