@@ -2,11 +2,13 @@ import {
   collection,
   doc,
   setDoc,
+  deleteDoc,
   getDocs,
   getDoc,
   onSnapshot,
   writeBatch,
   query,
+  where,
 } from 'firebase/firestore';
 import { db, testFirestoreConnection } from '../firebase';
 import {
@@ -20,14 +22,8 @@ import {
   PresensiCatatan,
 } from '../types/rapor';
 import {
-  initialSchoolInfo,
   initialGuruList,
-  initialKelasList,
-  initialMapelList,
   initialSiswaList,
-  initialSubjectConfigs,
-  generateInitialScores,
-  initialPresensiList,
 } from './initialData';
 import {
   loadSchoolInfo,
@@ -46,6 +42,7 @@ import {
   saveSubjectConfigs,
   saveScores,
   savePresensi,
+  markAppInitialized,
 } from './storage';
 
 export interface CloudSyncState {
@@ -56,7 +53,7 @@ export interface CloudSyncState {
 }
 
 /**
- * Initializes Firestore connection and seeds initial data if cloud is empty.
+ * Initializes Firestore connection and seeds initial data if cloud is completely empty.
  */
 export async function initializeCloudDatabase(): Promise<boolean> {
   try {
@@ -64,7 +61,7 @@ export async function initializeCloudDatabase(): Promise<boolean> {
     const schoolDoc = await getDoc(doc(db, 'schoolInfo', 'main'));
 
     if (!schoolDoc.exists()) {
-      // First time initialization: seed from localStorage or initialData
+      // First time ever initialization
       const currentSchool = loadSchoolInfo();
       const currentGurus = loadGuruList();
       const currentKelas = loadKelasList();
@@ -84,6 +81,7 @@ export async function initializeCloudDatabase(): Promise<boolean> {
         scores: currentScores,
         presensi: currentPresensi,
       });
+      markAppInitialized();
     }
     return true;
   } catch (err: any) {
@@ -105,10 +103,8 @@ export async function syncAllToCloud(data: {
   scores: NilaiRecord[];
   presensi: PresensiCatatan[];
 }) {
-  // Save school info
   await setDoc(doc(db, 'schoolInfo', 'main'), data.schoolInfo);
 
-  // Helper for batch saving items
   const saveBatchItems = async (colName: string, items: any[], getId: (item: any, idx: number) => string) => {
     const chunkSize = 400;
     for (let i = 0; i < items.length; i += chunkSize) {
@@ -133,7 +129,7 @@ export async function syncAllToCloud(data: {
 
 /**
  * Subscribes to Real-Time Updates from Cloud Database.
- * When data is changed by another teacher / device, this immediately fires!
+ * When an item is deleted or added on any device, this immediately fires with the accurate updated list!
  */
 export function subscribeToRealtimeCloudData(
   onDataLoaded: (data: {
@@ -165,15 +161,13 @@ export function subscribeToRealtimeCloudData(
     );
     unsubscribers.push(unsubSchool);
 
-    // 2. Gurus Listener
+    // 2. Gurus Listener (Syncs additions, edits, and permanent deletions)
     const unsubGurus = onSnapshot(
       collection(db, 'gurus'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as Guru);
-          saveGuruList(list);
-          onDataLoaded({ gurus: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as Guru);
+        saveGuruList(list);
+        onDataLoaded({ gurus: list });
       },
       onError
     );
@@ -183,11 +177,9 @@ export function subscribeToRealtimeCloudData(
     const unsubKelas = onSnapshot(
       collection(db, 'kelas'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as Kelas);
-          saveKelasList(list);
-          onDataLoaded({ kelas: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as Kelas);
+        saveKelasList(list);
+        onDataLoaded({ kelas: list });
       },
       onError
     );
@@ -197,26 +189,22 @@ export function subscribeToRealtimeCloudData(
     const unsubMapel = onSnapshot(
       collection(db, 'mapel'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
-          list.sort((a, b) => a.urutan - b.urutan);
-          saveMapelList(list);
-          onDataLoaded({ mapel: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
+        list.sort((a, b) => a.urutan - b.urutan);
+        saveMapelList(list);
+        onDataLoaded({ mapel: list });
       },
       onError
     );
     unsubscribers.push(unsubMapel);
 
-    // 5. Siswa Listener
+    // 5. Siswa Listener (Syncs additions, edits, and permanent deletions)
     const unsubSiswa = onSnapshot(
       collection(db, 'siswa'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as Siswa);
-          saveSiswaList(list);
-          onDataLoaded({ siswa: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as Siswa);
+        saveSiswaList(list);
+        onDataLoaded({ siswa: list });
       },
       onError
     );
@@ -226,11 +214,9 @@ export function subscribeToRealtimeCloudData(
     const unsubConfigs = onSnapshot(
       collection(db, 'subjectConfigs'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as SubjectConfig);
-          saveSubjectConfigs(list);
-          onDataLoaded({ configs: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as SubjectConfig);
+        saveSubjectConfigs(list);
+        onDataLoaded({ configs: list });
       },
       onError
     );
@@ -240,11 +226,9 @@ export function subscribeToRealtimeCloudData(
     const unsubScores = onSnapshot(
       collection(db, 'scores'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as NilaiRecord);
-          saveScores(list);
-          onDataLoaded({ scores: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as NilaiRecord);
+        saveScores(list);
+        onDataLoaded({ scores: list });
       },
       onError
     );
@@ -254,11 +238,9 @@ export function subscribeToRealtimeCloudData(
     const unsubPresensi = onSnapshot(
       collection(db, 'presensi'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map((d) => d.data() as PresensiCatatan);
-          savePresensi(list);
-          onDataLoaded({ presensi: list });
-        }
+        const list = snapshot.docs.map((d) => d.data() as PresensiCatatan);
+        savePresensi(list);
+        onDataLoaded({ presensi: list });
       },
       onError
     );
@@ -272,7 +254,8 @@ export function subscribeToRealtimeCloudData(
   };
 }
 
-// Individual entity savers
+// ==================== SAAVERS (CREATE & UPDATE) ====================
+
 export async function saveSchoolInfoCloud(info: SchoolInfo) {
   saveSchoolInfo(info);
   try {
@@ -380,4 +363,123 @@ export async function savePresensiCloud(presensi: PresensiCatatan[]) {
   } catch (e) {
     console.error('Error saving presensi to cloud:', e);
   }
+}
+
+// ==================== PERMANENT DELETERS (DELETE DOC FROM CLOUD) ====================
+
+/**
+ * Permanently deletes a Guru from Firestore and local storage.
+ */
+export async function deleteGuruCloud(guruId: string) {
+  try {
+    await deleteDoc(doc(db, 'gurus', guruId));
+  } catch (e) {
+    console.error('Error deleting guru from cloud:', e);
+  }
+}
+
+/**
+ * Permanently deletes a Siswa from Firestore and removes their scores and presensi from Cloud.
+ */
+export async function deleteSiswaCloud(siswaId: string) {
+  try {
+    // 1. Delete student document
+    await deleteDoc(doc(db, 'siswa', siswaId));
+
+    // 2. Delete all scores for this student from Firestore
+    const scoresSnap = await getDocs(query(collection(db, 'scores'), where('siswaId', '==', siswaId)));
+    if (!scoresSnap.empty) {
+      const batch = writeBatch(db);
+      scoresSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 3. Delete presensi for this student from Firestore
+    const presensiSnap = await getDocs(collection(db, 'presensi'));
+    const presBatch = writeBatch(db);
+    let presCount = 0;
+    presensiSnap.docs.forEach((d) => {
+      const data = d.data();
+      if (data.siswaId === siswaId || d.id.endsWith(`_${siswaId}`)) {
+        presBatch.delete(d.ref);
+        presCount++;
+      }
+    });
+    if (presCount > 0) {
+      await presBatch.commit();
+    }
+  } catch (e) {
+    console.error('Error deleting siswa from cloud:', e);
+  }
+}
+
+/**
+ * Permanently deletes a Kelas from Firestore.
+ */
+export async function deleteKelasCloud(kelasId: string) {
+  try {
+    await deleteDoc(doc(db, 'kelas', kelasId));
+  } catch (e) {
+    console.error('Error deleting kelas from cloud:', e);
+  }
+}
+
+/**
+ * Permanently deletes a Mapel from Firestore.
+ */
+export async function deleteMapelCloud(mapelId: string) {
+  try {
+    await deleteDoc(doc(db, 'mapel', mapelId));
+  } catch (e) {
+    console.error('Error deleting mapel from cloud:', e);
+  }
+}
+
+/**
+ * One-click helper: Permanently purge all initial demo teachers from Cloud and Local.
+ */
+export async function purgeAllDemoGurusCloud() {
+  const demoIds = initialGuruList.map((g) => g.id);
+  const batch = writeBatch(db);
+  for (const id of demoIds) {
+    batch.delete(doc(db, 'gurus', id));
+  }
+  await batch.commit();
+}
+
+/**
+ * One-click helper: Permanently purge all initial demo students from Cloud and Local.
+ */
+export async function purgeAllDemoSiswaCloud() {
+  const demoIds = initialSiswaList.map((s) => s.id);
+  const batch = writeBatch(db);
+  for (const id of demoIds) {
+    batch.delete(doc(db, 'siswa', id));
+  }
+  await batch.commit();
+
+  // Also clean demo scores and presensi
+  const scoresSnap = await getDocs(collection(db, 'scores'));
+  const scoreBatch = writeBatch(db);
+  let sCount = 0;
+  scoresSnap.docs.forEach((d) => {
+    const sId = d.data().siswaId;
+    if (demoIds.includes(sId)) {
+      scoreBatch.delete(d.ref);
+      sCount++;
+    }
+  });
+  if (sCount > 0) await scoreBatch.commit();
+
+  const presensiSnap = await getDocs(collection(db, 'presensi'));
+  const presBatch = writeBatch(db);
+  let pCount = 0;
+  presensiSnap.docs.forEach((d) => {
+    const sId = d.data().siswaId;
+    if (demoIds.includes(sId)) {
+      presBatch.delete(d.ref);
+      pCount++;
+    }
+  });
+  if (pCount > 0) await presBatch.commit();
 }

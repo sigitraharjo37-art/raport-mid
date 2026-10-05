@@ -2,6 +2,7 @@ import { SchoolInfo, Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, Pr
 import { initialSchoolInfo, initialKelasList, initialMapelList, initialSiswaList, initialSubjectConfigs, generateInitialScores, initialPresensiList, initialGuruList } from './initialData';
 
 const STORAGE_KEYS = {
+  INITIALIZED: 'erapor_initialized_flag_v2',
   SCHOOL_INFO: 'erapor_school_info_v1',
   GURU_LIST: 'erapor_guru_list_v1',
   KELAS_LIST: 'erapor_kelas_list_v1',
@@ -11,6 +12,14 @@ const STORAGE_KEYS = {
   SCORES_LIST: 'erapor_scores_list_v1',
   PRESENSI_LIST: 'erapor_presensi_list_v1',
 };
+
+export function markAppInitialized(): void {
+  localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
+}
+
+export function isAppInitialized(): boolean {
+  return localStorage.getItem(STORAGE_KEYS.INITIALIZED) === 'true';
+}
 
 export function loadSchoolInfo(): SchoolInfo {
   try {
@@ -23,97 +32,126 @@ export function loadSchoolInfo(): SchoolInfo {
 
 export function saveSchoolInfo(data: SchoolInfo): void {
   localStorage.setItem(STORAGE_KEYS.SCHOOL_INFO, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadGuruList(): Guru[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.GURU_LIST);
-    return raw ? JSON.parse(raw) : initialGuruList;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialGuruList;
   } catch {
-    return initialGuruList;
+    return isAppInitialized() ? [] : initialGuruList;
   }
 }
 
 export function saveGuruList(data: Guru[]): void {
   localStorage.setItem(STORAGE_KEYS.GURU_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadKelasList(): Kelas[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.KELAS_LIST);
-    return raw ? JSON.parse(raw) : initialKelasList;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialKelasList;
   } catch {
-    return initialKelasList;
+    return isAppInitialized() ? [] : initialKelasList;
   }
 }
 
 export function saveKelasList(data: Kelas[]): void {
   localStorage.setItem(STORAGE_KEYS.KELAS_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadMapelList(): MataPelajaran[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.MAPEL_LIST);
-    return raw ? JSON.parse(raw) : initialMapelList;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialMapelList;
   } catch {
-    return initialMapelList;
+    return isAppInitialized() ? [] : initialMapelList;
   }
 }
 
 export function saveMapelList(data: MataPelajaran[]): void {
   localStorage.setItem(STORAGE_KEYS.MAPEL_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadSiswaList(): Siswa[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SISWA_LIST);
-    return raw ? JSON.parse(raw) : initialSiswaList;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialSiswaList;
   } catch {
-    return initialSiswaList;
+    return isAppInitialized() ? [] : initialSiswaList;
   }
 }
 
 export function saveSiswaList(data: Siswa[]): void {
   localStorage.setItem(STORAGE_KEYS.SISWA_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadSubjectConfigs(): SubjectConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CONFIG_LIST);
-    return raw ? JSON.parse(raw) : initialSubjectConfigs;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialSubjectConfigs;
   } catch {
-    return initialSubjectConfigs;
+    return isAppInitialized() ? [] : initialSubjectConfigs;
   }
 }
 
 export function saveSubjectConfigs(data: SubjectConfig[]): void {
   localStorage.setItem(STORAGE_KEYS.CONFIG_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadScores(): NilaiRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SCORES_LIST);
-    return raw ? JSON.parse(raw) : generateInitialScores();
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : generateInitialScores();
   } catch {
-    return generateInitialScores();
+    return isAppInitialized() ? [] : generateInitialScores();
   }
 }
 
 export function saveScores(data: NilaiRecord[]): void {
   localStorage.setItem(STORAGE_KEYS.SCORES_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function loadPresensi(): PresensiCatatan[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PRESENSI_LIST);
-    return raw ? JSON.parse(raw) : initialPresensiList;
+    if (raw !== null) {
+      return JSON.parse(raw);
+    }
+    return isAppInitialized() ? [] : initialPresensiList;
   } catch {
-    return initialPresensiList;
+    return isAppInitialized() ? [] : initialPresensiList;
   }
 }
 
 export function savePresensi(data: PresensiCatatan[]): void {
   localStorage.setItem(STORAGE_KEYS.PRESENSI_LIST, JSON.stringify(data));
+  markAppInitialized();
 }
 
 export function resetAllToDefault(): void {

@@ -44,6 +44,12 @@ import {
   saveSubjectConfigsCloud,
   saveScoresCloud,
   savePresensiCloud,
+  deleteGuruCloud,
+  deleteSiswaCloud,
+  deleteKelasCloud,
+  deleteMapelCloud,
+  purgeAllDemoGurusCloud,
+  purgeAllDemoSiswaCloud,
   syncAllToCloud,
 } from './utils/cloudStorage';
 import { HeaderNav } from './components/HeaderNav';
@@ -132,7 +138,18 @@ export default function App() {
   const handleDeleteGuru = (id: string) => {
     const updated = guruList.filter((g) => g.id !== id);
     setGuruList(updated);
-    saveGurusCloud(updated);
+    saveGuruList(updated);
+    deleteGuruCloud(id);
+  };
+
+  const handlePurgeAllDemoGurus = async () => {
+    if (!confirm('Hapus PERMANEN semua data guru demo bawaan dari Cloud dan Local?')) return;
+    await purgeAllDemoGurusCloud();
+    const demoIds = ['g-1', 'g-2', 'g-3', 'g-4', 'g-5', 'g-6', 'g-7', 'g-8', 'g-9', 'g-10', 'g-11', 'g-12', 'g-13'];
+    const updated = guruList.filter((g) => !demoIds.includes(g.id));
+    setGuruList(updated);
+    saveGuruList(updated);
+    alert('Seluruh data guru demo berhasil dihapus permanen dari Cloud dan Lokal!');
   };
 
   // Handlers for Kelas
@@ -152,7 +169,8 @@ export default function App() {
   const handleDeleteKelas = (id: string) => {
     const updated = kelasList.filter((k) => k.id !== id);
     setKelasList(updated);
-    saveKelasCloud(updated);
+    saveKelasList(updated);
+    deleteKelasCloud(id);
     if (selectedKelasId === id && updated.length > 0) {
       setSelectedKelasId(updated[0].id);
     }
@@ -174,7 +192,8 @@ export default function App() {
   const handleDeleteMapel = (id: string) => {
     const updated = mapelList.filter((m) => m.id !== id);
     setMapelList(updated);
-    saveMapelCloud(updated);
+    saveMapelList(updated);
+    deleteMapelCloud(id);
   };
 
   // Handlers for Siswa
@@ -199,7 +218,36 @@ export default function App() {
   const handleDeleteSiswa = (id: string) => {
     const updated = siswaList.filter((s) => s.id !== id);
     setSiswaList(updated);
-    saveSiswaCloud(updated);
+    saveSiswaList(updated);
+    deleteSiswaCloud(id);
+
+    // Also remove local scores and presensi for this student
+    const updatedScores = scoresList.filter((sc) => sc.siswaId !== id);
+    setScoresList(updatedScores);
+    saveScores(updatedScores);
+
+    const updatedPresensi = presensiList.filter((p) => p.siswaId !== id);
+    setPresensiList(updatedPresensi);
+    savePresensi(updatedPresensi);
+  };
+
+  const handlePurgeAllDemoSiswa = async () => {
+    if (!confirm('Hapus PERMANEN semua data peserta didik demo bawaan dari Cloud dan Local?')) return;
+    await purgeAllDemoSiswaCloud();
+    const demoIds = ['s-1', 's-2', 's-3', 's-4', 's-5', 's-6', 's-7', 's-8', 's-9', 's-10', 's-11', 's-12', 's-13', 's-14', 's-15'];
+    const updatedSiswa = siswaList.filter((s) => !demoIds.includes(s.id));
+    setSiswaList(updatedSiswa);
+    saveSiswaList(updatedSiswa);
+
+    const updatedScores = scoresList.filter((sc) => !demoIds.includes(sc.siswaId));
+    setScoresList(updatedScores);
+    saveScores(updatedScores);
+
+    const updatedPresensi = presensiList.filter((p) => !demoIds.includes(p.siswaId));
+    setPresensiList(updatedPresensi);
+    savePresensi(updatedPresensi);
+
+    alert('Seluruh data siswa demo berhasil dihapus permanen dari Cloud dan Lokal!');
   };
 
   // Handlers for Subject Config & Scores
@@ -428,6 +476,7 @@ export default function App() {
               onUpdateGuru={handleUpdateGuru}
               onDeleteGuru={handleDeleteGuru}
               onAddBatchGuru={handleAddBatchGuru}
+              onPurgeDemoGurus={handlePurgeAllDemoGurus}
             />
           )}
 
@@ -441,6 +490,7 @@ export default function App() {
               onUpdateSiswa={handleUpdateSiswa}
               onDeleteSiswa={handleDeleteSiswa}
               onAddBatchSiswa={handleAddBatchSiswa}
+              onPurgeDemoSiswa={handlePurgeAllDemoSiswa}
             />
           )}
 

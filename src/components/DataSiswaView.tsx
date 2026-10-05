@@ -23,6 +23,7 @@ interface DataSiswaViewProps {
   onUpdateSiswa: (siswa: Siswa) => void;
   onDeleteSiswa: (siswaId: string) => void;
   onAddBatchSiswa: (newSiswa: Siswa[]) => void;
+  onPurgeDemoSiswa?: () => void;
 }
 
 export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
@@ -34,6 +35,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   onUpdateSiswa,
   onDeleteSiswa,
   onAddBatchSiswa,
+  onPurgeDemoSiswa,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -326,6 +328,18 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             <UserPlus className="w-4 h-4" />
             <span className="hidden sm:inline">Tambah Cepat</span>
           </button>
+
+          {/* Hapus Semua Siswa Demo */}
+          {onPurgeDemoSiswa && siswaList.some((s) => s.id.startsWith('s-')) && (
+            <button
+              onClick={onPurgeDemoSiswa}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition shadow-xs"
+              title="Hapus seluruh peserta didik data demo contoh bawaan secara permanen dari Cloud dan Local"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Hapus Siswa Demo</span>
+            </button>
+          )}
 
           {/* Ekspor Excel */}
           <button

@@ -22,6 +22,7 @@ interface DataGuruViewProps {
   onUpdateGuru: (guru: Guru) => void;
   onDeleteGuru: (guruId: string) => void;
   onAddBatchGuru: (newGurus: Guru[]) => void;
+  onPurgeDemoGurus?: () => void;
 }
 
 export const DataGuruView: React.FC<DataGuruViewProps> = ({
@@ -30,6 +31,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   onUpdateGuru,
   onDeleteGuru,
   onAddBatchGuru,
+  onPurgeDemoGurus,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -254,6 +256,18 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
             <Plus className="w-4 h-4" />
             <span>Tambah Guru</span>
           </button>
+
+          {/* Hapus Semua Guru Demo Bawaan */}
+          {onPurgeDemoGurus && guruList.some((g) => g.id.startsWith('g-')) && (
+            <button
+              onClick={onPurgeDemoGurus}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition shadow-xs"
+              title="Hapus seluruh guru data demo contoh bawaan secara permanen dari Cloud dan Local"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Hapus Guru Demo</span>
+            </button>
+          )}
 
           {/* Ekspor Excel */}
           <button
