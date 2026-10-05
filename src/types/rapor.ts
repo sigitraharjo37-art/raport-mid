@@ -19,6 +19,8 @@ export interface SchoolInfo {
   kurikulum: 'Kurikulum Merdeka' | 'Kurikulum 2013';
   logoSekolah?: string;
   logoKabupaten?: string;
+  kopInstansi1?: string; // e.g. "PEMERINTAH KABUPATEN LOMBOK UTARA"
+  kopInstansi2?: string; // e.g. "Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora) Kabupaten Lombok Utara"
   tampilkanFormatif?: boolean; // Centang nilai formatif (default true)
   tampilkanSumatif?: boolean; // Centang nilai sumatif (default true)
 }

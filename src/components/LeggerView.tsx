@@ -124,6 +124,41 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Khusus Cetak / Ekspor PDF Leger: Kertas Ukuran F4 / Folio (330mm x 215mm) Landscape */}
+      <style>{`
+        @media print {
+          @page {
+            size: 330mm 215mm landscape !important;
+            margin: 6mm 8mm 6mm 8mm !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+          body {
+            font-size: 8.5pt !important;
+            background: white !important;
+            color: black !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+          }
+          th, td {
+            border: 1px solid black !important;
+            padding: 2.5px 2px !important;
+          }
+          .print-avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       {/* Top Banner and Filter Bar */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs no-print">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -170,10 +205,10 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
             <button
               onClick={handlePrint}
               className="inline-flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 transition"
-              title="Cetak Buku Leger ke Kertas / PDF"
+              title="Cetak atau Simpan Buku Leger ke PDF Ukuran Kertas F4 / Folio (330 x 215 mm) Posisi Landscape"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Leger (PDF)</span>
+              <span>Cetak Leger (PDF F4 Landscape)</span>
             </button>
           </div>
         </div>
@@ -304,10 +339,16 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
             )}
           </div>
           <div className="flex-1 text-center px-4">
-            <h1 className="text-base font-bold uppercase">{schoolInfo.namaSekolah}</h1>
-            <h2 className="text-sm font-bold uppercase">
-              LEGER NILAI {schoolInfo.jenisRapor.toUpperCase()}
+            <h1 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              {schoolInfo.kopInstansi1 || 'PEMERINTAH KABUPATEN LOMBOK UTARA'}
+            </h1>
+            <h2 className="text-[11px] font-semibold text-slate-700">
+              {(schoolInfo.kopInstansi2 || 'Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)').replace(/\s*Kabupaten Lombok Utara\s*$/i, '')}
             </h2>
+            <h3 className="text-base font-bold uppercase text-black mt-0.5">{schoolInfo.namaSekolah}</h3>
+            <h4 className="text-xs font-bold uppercase">
+              LEGER NILAI {schoolInfo.jenisRapor.toUpperCase()}
+            </h4>
             <p className="text-[11px]">
               Tahun Ajaran {schoolInfo.tahunAjaran} • Semester {schoolInfo.semester} • Kurikulum {schoolInfo.kurikulum}
             </p>

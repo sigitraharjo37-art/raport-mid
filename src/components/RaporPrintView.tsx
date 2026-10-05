@@ -151,10 +151,10 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
             {/* Teks KOP Tengah */}
             <div className="flex-1 px-4 text-center">
               <h1 className="text-base font-bold uppercase tracking-wider">
-                PEMERINTAH DAERAH {schoolInfo.provinsi.toUpperCase()}
+                {schoolInfo.kopInstansi1 || 'PEMERINTAH KABUPATEN LOMBOK UTARA'}
               </h1>
               <h2 className="text-sm font-bold uppercase">
-                DINAS PENDIDIKAN DAN KEBUDAYAAN
+                {(schoolInfo.kopInstansi2 || 'Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)').replace(/\s*Kabupaten Lombok Utara\s*$/i, '')}
               </h2>
               <h3 className="text-lg font-black uppercase tracking-tight text-slate-950">
                 {schoolInfo.namaSekolah}
@@ -245,8 +245,7 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
                   Mata Pelajaran {showTeacherOnReport && <span className="font-normal text-[10px]">/ Guru Pengampu</span>}
                 </th>
                 <th className="border border-black py-2 px-1.5 w-14">KKTP</th>
-                <th className="border border-black py-2 px-1.5 w-14">Nilai Akhir</th>
-                <th className="border border-black py-2 px-1.5 w-14">Predikat</th>
+                <th className="border border-black py-2 px-1.5 w-16">Nilai Akhir</th>
                 <th className="border border-black py-2 px-3 text-left">
                   Capaian Kompetensi / Deskripsi Pembelajaran
                 </th>
@@ -259,13 +258,6 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
                 const kktpVal = cfg?.kktp ?? 75;
                 const nilaiAkhir = rec?.nilaiAkhir ?? 0;
                 const capaian = rec?.capaianKompetensi ?? '';
-
-                // Predikat
-                let predikat = 'C';
-                if (nilaiAkhir >= 90) predikat = 'A';
-                else if (nilaiAkhir >= 80) predikat = 'B';
-                else if (nilaiAkhir >= kktpVal) predikat = 'C';
-                else predikat = 'D';
 
                 return (
                   <tr key={mapel.id} className="align-top">
@@ -285,9 +277,6 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
                     </td>
                     <td className="border border-black py-1.5 px-1 text-center font-bold font-mono text-sm">
                       {nilaiAkhir || '-'}
-                    </td>
-                    <td className="border border-black py-1.5 px-1 text-center font-bold">
-                      {predikat}
                     </td>
                     <td className="border border-black py-1.5 px-2.5 text-[11px] leading-relaxed">
                       {capaian || (
@@ -397,6 +386,22 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Khusus Cetak / PDF Lembar Rapor Siswa: Kertas A4 Portrait */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait !important;
+            margin: 10mm 12mm 10mm 12mm !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+        }
+      `}</style>
+
       {/* Control Panel (Hidden on Print) */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs no-print space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

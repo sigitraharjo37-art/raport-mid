@@ -93,9 +93,39 @@ export default function App() {
     // 1. Initialize cloud database & seed if empty
     initializeCloudDatabase();
 
+    // Ensure KOP header is set to Lombok Utara by default
+    setSchoolInfo((prev) => {
+      const cleanKop2 = (prev.kopInstansi2 || 'Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)').replace(/\s*Kabupaten Lombok Utara\s*$/i, '');
+      if (
+        !prev.kopInstansi1 ||
+        prev.kopInstansi1.includes('PEMERINTAH DAERAH') ||
+        prev.kopInstansi1.includes('DKI') ||
+        prev.kopInstansi2?.includes('Kabupaten Lombok Utara')
+      ) {
+        const next = {
+          ...prev,
+          kopInstansi1: 'PEMERINTAH KABUPATEN LOMBOK UTARA',
+          kopInstansi2: cleanKop2,
+          kabupatenKota: prev.kabupatenKota && !prev.kabupatenKota.includes('Jakarta') ? prev.kabupatenKota : 'Kabupaten Lombok Utara',
+          provinsi: prev.provinsi && !prev.provinsi.includes('DKI') ? prev.provinsi : 'Nusa Tenggara Barat',
+        };
+        saveSchoolInfoCloud(next);
+        return next;
+      }
+      return prev;
+    });
+
     // 2. Real-time multi-device sync listener
     const unsubscribe = subscribeToRealtimeCloudData((cloudData) => {
-      if (cloudData.schoolInfo) setSchoolInfo(cloudData.schoolInfo);
+      if (cloudData.schoolInfo) {
+        const cleanKop2 = (cloudData.schoolInfo.kopInstansi2 || 'Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)').replace(/\s*Kabupaten Lombok Utara\s*$/i, '');
+        const info = {
+          ...cloudData.schoolInfo,
+          kopInstansi1: cloudData.schoolInfo.kopInstansi1 || 'PEMERINTAH KABUPATEN LOMBOK UTARA',
+          kopInstansi2: cleanKop2,
+        };
+        setSchoolInfo(info);
+      }
       if (cloudData.gurus) setGuruList(cloudData.gurus);
       if (cloudData.kelas) setKelasList(cloudData.kelas);
       if (cloudData.mapel) setMapelList(cloudData.mapel);

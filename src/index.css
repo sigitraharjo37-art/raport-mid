@@ -10,9 +10,10 @@
   body {
     background: white !important;
     color: black !important;
-    font-size: 11pt;
     margin: 0;
     padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .no-print {
@@ -31,19 +32,5 @@
   .print-avoid-break {
     page-break-inside: avoid;
     break-inside: avoid;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 1.2cm 1.5cm 1.5cm 1.5cm;
-  }
-
-  @page landscape-page {
-    size: A4 landscape;
-    margin: 1cm;
-  }
-
-  .print-landscape {
-    page: landscape-page;
   }
 }

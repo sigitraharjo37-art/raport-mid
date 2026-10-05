@@ -241,6 +241,31 @@ export const DataSekolahModal: React.FC<DataSekolahModalProps> = ({
                 />
               </div>
 
+              <div className="md:col-span-2 bg-indigo-50/50 p-3 rounded-xl border border-indigo-200">
+                <div className="mb-2">
+                  <label className="block text-xs font-bold text-indigo-900 mb-0.5">KOP Header Baris 1 (Pemerintah Daerah / Kabupaten)</label>
+                  <input
+                    type="text"
+                    name="kopInstansi1"
+                    value={formData.kopInstansi1 || ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold uppercase focus:ring-2 focus:ring-indigo-500"
+                    placeholder="PEMERINTAH KABUPATEN LOMBOK UTARA"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-indigo-900 mb-0.5">KOP Header Baris 2 (Dinas / Instansi Pendidikan)</label>
+                  <input
+                    type="text"
+                    name="kopInstansi2"
+                    value={formData.kopInstansi2 || ''}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Kabupaten / Kota</label>
                 <input
