@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, SchoolInfo, Guru } from '../types/rapor';
+import { Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, SchoolInfo, Guru, DAFTAR_AGAMA } from '../types/rapor';
 import { exportNilaiMapelToExcel } from '../utils/excelExport';
 import {
   FileEdit,
@@ -13,8 +13,18 @@ import {
   TrendingUp,
   Percent,
   FileText,
+  BookOpen,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+
+export const CONTOH_DESKRIPSI_AGAMA: Record<string, string> = {
+  Islam: 'Memahami hakikat beriman kepada kitab-kitab Allah serta meneladani perilaku jujur dan amanah.',
+  Kristen: 'Menghayati karya keselamatan Allah melalui Yesus Kristus dan mempraktikkan kasih serta keteladanan hidup beriman.',
+  Katolik: 'Memahami panggilan hidup sebagai murid Kristus dan mewujudkan nilai-nilai Kerajaan Allah dalam kehidupan sehari-hari.',
+  Hindu: 'Memahami ajaran Tri Hita Karana, Panca Sradha, serta perilaku beretika dan berbudi luhur sesuai ajaran Veda.',
+  Buddha: 'Memahami ajaran Empat Kebenaran Mulia, Hukum Karma, dan pengamalan Pancasila Buddhis dalam kehidupan bermasyarakat.',
+  Konghucu: 'Memahami kebajikan Ren (Cinta Kasih), Xiao (Bakti), serta pengamalan ajaran moral Tian dalam kehidupan beragama.',
+};
 
 interface InputNilaiViewProps {
   schoolInfo: SchoolInfo;
@@ -48,6 +58,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const [bobotFormatif, setBobotFormatif] = useState(50);
   const [bobotSumatif, setBobotSumatif] = useState(50);
   const [deskripsiMapel, setDeskripsiMapel] = useState('');
+  const [deskripsiPerAgama, setDeskripsiPerAgama] = useState<Record<string, string>>({});
+  const [activeAgamaTab, setActiveAgamaTab] = useState<string>('Islam');
 
   // Local state for scores of current class and subject
   const [localScores, setLocalScores] = useState<Record<string, { formatif: number; sumatif: number; akhir: number; capaian: string }>>({});
@@ -86,12 +98,19 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       setBobotFormatif(conf.bobotFormatif ?? 50);
       setBobotSumatif(conf.bobotSumatif ?? 50);
       setDeskripsiMapel(conf.deskripsiMapel || '');
+      setDeskripsiPerAgama(conf.deskripsiPerAgama || {});
     } else {
       setNamaGuru('');
       setKktp(75);
       setBobotFormatif(50);
       setBobotSumatif(50);
       setDeskripsiMapel('');
+      // Auto-populate recommendation for religion subject if fresh
+      if (selectedMapelId.toLowerCase().includes('pai') || selectedMapelId.toLowerCase().includes('agama')) {
+        setDeskripsiPerAgama(CONTOH_DESKRIPSI_AGAMA);
+      } else {
+        setDeskripsiPerAgama({});
+      }
     }
 
     // Load scores
@@ -149,11 +168,10 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
     }));
   };
 
-  // Auto-generate realistic capaian text based on KKTP, score, and input deskripsi materi
+  // Auto-generate realistic capaian text based on KKTP, score, and input deskripsi materi (per agama)
   const handleGenerateDeskripsiAll = () => {
     if (!currentMapel) return;
     const mapelName = currentMapel.nama;
-    const materiText = deskripsiMapel.trim() || `materi pokok dan capaian pembelajaran ${mapelName}`;
 
     setLocalScores((prev) => {
       const updated = { ...prev };
@@ -161,6 +179,12 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         const item = updated[s.id];
         if (!item) return;
         const akhir = item.akhir;
+        const sAgama = s.agama || 'Islam';
+
+        // Ambil materi per agama jika diisi guru, atau fallback ke deskripsi umum
+        const agamaMateri = deskripsiPerAgama[sAgama]?.trim();
+        const materiText = agamaMateri || deskripsiMapel.trim() || `materi pokok dan capaian pembelajaran ${mapelName}`;
+
         let text = '';
         if (akhir >= 92) {
           text = `Menunjukkan penguasaan kompetensi yang sangat istimewa dalam ${materiText}, mampu berpikir kritis dan mandiri.`;
@@ -177,6 +201,25 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
     });
   };
 
+  const handleSetAgamaDeskripsi = (agama: string, value: string) => {
+    setDeskripsiPerAgama((prev) => ({
+      ...prev,
+      [agama]: value,
+    }));
+  };
+
+  const handleFillAllExampleAgama = () => {
+    setDeskripsiPerAgama(CONTOH_DESKRIPSI_AGAMA);
+  };
+
+  const handleCopyFromGeneral = (agama: string) => {
+    if (!deskripsiMapel.trim()) {
+      alert('Deskripsi umum belum diisi.');
+      return;
+    }
+    handleSetAgamaDeskripsi(agama, deskripsiMapel.trim());
+  };
+
   const handleSaveAll = () => {
     // 1. Save Config
     const newConfig: SubjectConfig = {
@@ -187,6 +230,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       bobotFormatif: Number(bobotFormatif) || 50,
       bobotSumatif: Number(bobotSumatif) || 50,
       deskripsiMapel: deskripsiMapel.trim(),
+      deskripsiPerAgama: deskripsiPerAgama,
     };
     onSaveConfig(newConfig);
 
@@ -534,8 +578,115 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
             className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
           />
           <p className="text-[11px] text-indigo-300/80 mt-1">
-            Deskripsi ini akan digunakan sebagai dasar kalimat capaian kompetensi pada rapor siswa ({currentMapel?.nama}). Guru juga dapat menyesuaikan deskripsi per siswa pada tabel nilai di bawah.
+            Deskripsi umum ini digunakan sebagai dasar kalimat capaian kompetensi pada rapor siswa ({currentMapel?.nama}).
           </p>
+        </div>
+
+        {/* Input Deskripsi / TP Per Agama */}
+        <div className="mt-5 pt-4 border-t border-indigo-800/80">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div>
+              <label className="text-xs font-bold text-amber-300 flex items-center space-x-1.5 uppercase tracking-wide">
+                <BookOpen className="w-4 h-4 text-amber-400" />
+                <span>Input Deskripsi Capaian Pembelajaran Tiap Agama:</span>
+              </label>
+              <p className="text-[11px] text-indigo-300/80 mt-0.5">
+                Deskripsi akan otomatis disesuaikan dan dicetak di lembar rapor sesuai agama masing-masing peserta didik.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleFillAllExampleAgama}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg text-xs font-semibold border border-amber-400/30 transition shadow-xs"
+                title="Muat deskripsi standar Kurikulum Merdeka untuk seluruh 6 agama"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Muat Standar Semua Agama</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tab Selector Tiap Agama */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-3 bg-slate-900/60 p-1.5 rounded-xl border border-indigo-900/80">
+            {DAFTAR_AGAMA.map((agama) => {
+              const countInClass = currentSiswa.filter((s) => (s.agama || 'Islam') === agama).length;
+              const isFilled = !!deskripsiPerAgama[agama]?.trim();
+              const isActive = activeAgamaTab === agama;
+
+              return (
+                <button
+                  key={agama}
+                  type="button"
+                  onClick={() => setActiveAgamaTab(agama)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
+                    isActive
+                      ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-extrabold'
+                      : 'text-indigo-200 hover:bg-white/10'
+                  }`}
+                >
+                  <span>{agama}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold ${
+                      isActive
+                        ? 'bg-black/20 text-slate-900'
+                        : countInClass > 0
+                        ? 'bg-indigo-600/80 text-white'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {countInClass} siswa
+                  </span>
+                  {isFilled && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Deskripsi terisi" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Religion Description Textarea & Action Bar */}
+          <div className="bg-slate-950/40 p-3.5 rounded-xl border border-indigo-800/60 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5 flex-wrap">
+                <span>Deskripsi Materi Pembelajaran untuk Siswa Beragama:</span>
+                <span className="font-extrabold text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/30">
+                  {activeAgamaTab}
+                </span>
+                <span className="text-slate-400 text-[11px]">
+                  ({currentSiswa.filter((s) => (s.agama || 'Islam') === activeAgamaTab).length} siswa di Kelas {currentKelas?.nama})
+                </span>
+              </span>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleSetAgamaDeskripsi(activeAgamaTab, CONTOH_DESKRIPSI_AGAMA[activeAgamaTab] || '')}
+                  className="text-[11px] px-2 py-0.5 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-200 rounded border border-indigo-600 transition"
+                  title="Gunakan kalimat materi standar Kurikulum Merdeka"
+                >
+                  Gunakan Rekomendasi {activeAgamaTab}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyFromGeneral(activeAgamaTab)}
+                  className="text-[11px] px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-600 transition"
+                  title="Salin isi deskripsi umum ke agama ini"
+                >
+                  Salin dari Deskripsi Umum
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              rows={2}
+              value={deskripsiPerAgama[activeAgamaTab] || ''}
+              onChange={(e) => handleSetAgamaDeskripsi(activeAgamaTab, e.target.value)}
+              placeholder={`Contoh deskripsi capaian pembelajaran bagi siswa beragama ${activeAgamaTab}...`}
+              className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
+            />
+            <p className="text-[11px] text-amber-200/80">
+              💡 Klik tombol <strong>"Terapkan Deskripsi ke Semua Siswa"</strong> di atas atau <strong>"Auto Deskripsi"</strong> agar kalimat capaian otomatis tersusun sesuai nilai & agama masing-masing siswa.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -631,9 +782,12 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                       {s.nis}
                     </td>
                     <td className="py-3 px-4 font-bold text-slate-800">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <span>{s.nama}</span>
                         <span className="text-[10px] text-slate-400">({s.jenisKelamin})</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {s.agama || 'Islam'}
+                        </span>
                       </div>
                     </td>
                     {/* Formatif Input (muncul jika dicentang) */}

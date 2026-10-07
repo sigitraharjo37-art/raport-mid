@@ -49,6 +49,17 @@ export interface MataPelajaran {
   urutan: number;
 }
 
+export const DAFTAR_AGAMA = [
+  'Islam',
+  'Kristen',
+  'Katolik',
+  'Hindu',
+  'Buddha',
+  'Konghucu',
+] as const;
+
+export type Agama = (typeof DAFTAR_AGAMA)[number];
+
 export interface SubjectConfig {
   kelasId: string;
   mapelId: string;
@@ -59,6 +70,7 @@ export interface SubjectConfig {
   deskripsiMapel?: string; // Deskripsi Lingkup Materi / Tujuan Pembelajaran STS
   deskripsiTuntas?: string; // Template deskripsi untuk siswa yang mencapai KKTP
   deskripsiRemedial?: string; // Template deskripsi untuk siswa yang perlu bimbingan
+  deskripsiPerAgama?: Record<string, string>; // Deskripsi materi / TP per agama (Islam, Kristen, dsb.)
 }
 
 export interface Siswa {
@@ -67,6 +79,7 @@ export interface Siswa {
   nisn: string;
   nama: string;
   jenisKelamin: 'L' | 'P';
+  agama?: string; // Agama siswa: Islam, Kristen, Katolik, Hindu, Buddha, Konghucu
   kelasId: string;
 }
 

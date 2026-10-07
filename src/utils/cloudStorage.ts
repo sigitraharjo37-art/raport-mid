@@ -90,6 +90,16 @@ export async function initializeCloudDatabase(): Promise<boolean> {
   }
 }
 
+function cleanDocForFirestore<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      result[key] = obj[key];
+    }
+  });
+  return result;
+}
+
 /**
  * Syncs everything to Firestore
  */
@@ -112,7 +122,8 @@ export async function syncAllToCloud(data: {
       const batch = writeBatch(db);
       chunk.forEach((item, idx) => {
         const id = getId(item, i + idx);
-        batch.set(doc(db, colName, id), item);
+        const cleanedItem = cleanDocForFirestore(item);
+        batch.set(doc(db, colName, id), cleanedItem);
       });
       await batch.commit();
     }
@@ -312,7 +323,11 @@ export async function saveSiswaCloud(siswa: Siswa[]) {
       const chunk = siswa.slice(i, i + chunkSize);
       const batch = writeBatch(db);
       chunk.forEach((s) => {
-        batch.set(doc(db, 'siswa', s.id), s);
+        const cleaned = cleanDocForFirestore({
+          ...s,
+          agama: s.agama || 'Islam',
+        });
+        batch.set(doc(db, 'siswa', s.id), cleaned);
       });
       await batch.commit();
     }
@@ -326,7 +341,11 @@ export async function saveSubjectConfigsCloud(configs: SubjectConfig[]) {
   try {
     const batch = writeBatch(db);
     configs.forEach((c) => {
-      batch.set(doc(db, 'subjectConfigs', `${c.kelasId}_${c.mapelId}`), c);
+      const cleaned = cleanDocForFirestore({
+        ...c,
+        deskripsiPerAgama: c.deskripsiPerAgama || {},
+      });
+      batch.set(doc(db, 'subjectConfigs', `${c.kelasId}_${c.mapelId}`), cleaned);
     });
     await batch.commit();
   } catch (e) {

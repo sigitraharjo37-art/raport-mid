@@ -141,7 +141,7 @@ export function exportNilaiMapelToExcel(
   const showFormatif = schoolInfo.tampilkanFormatif ?? true;
   const showSumatif = schoolInfo.tampilkanSumatif ?? true;
 
-  let tableHeaders = ['No', 'NIS', 'NISN', 'Nama Siswa', 'L/P'];
+  let tableHeaders = ['No', 'NIS', 'NISN', 'Nama Siswa', 'L/P', 'Agama'];
   if (showFormatif && showSumatif) {
     tableHeaders.push('Nilai Formatif (Tugas)', 'Nilai Sumatif (STS)', 'Nilai Akhir');
   } else if (showFormatif) {
@@ -175,6 +175,7 @@ export function exportNilaiMapelToExcel(
       s.nisn,
       s.nama,
       s.jenisKelamin,
+      s.agama || 'Islam',
     ];
 
     if (showFormatif && showSumatif) {

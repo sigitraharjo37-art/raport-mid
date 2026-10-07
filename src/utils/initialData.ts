@@ -146,25 +146,41 @@ export const initialMapelList: MataPelajaran[] = [
 ];
 
 export const initialSiswaList: Siswa[] = [
-  { id: 's-1', nis: '240701', nisn: '0098451201', nama: 'Aditya Pratama Ramadhan', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-2', nis: '240702', nisn: '0098451202', nama: 'Anisa Citra Lestari', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-3', nis: '240703', nisn: '0098451203', nama: 'Bagas Satria Wibowo', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-4', nis: '240704', nisn: '0098451204', nama: 'Chelsea Aurelia Putri', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-5', nis: '240705', nisn: '0098451205', nama: 'Dimas Arya Nugroho', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-6', nis: '240706', nisn: '0098451206', nama: 'Fadhil Muhammad Ridwan', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-7', nis: '240707', nisn: '0098451207', nama: 'Gisella Natasha', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-8', nis: '240708', nisn: '0098451208', nama: 'Haikal Zikri Ilham', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-9', nis: '240709', nisn: '0098451209', nama: 'Intan Nuraini', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-10', nis: '240710', nisn: '0098451210', nama: 'Kevin Jonathan Sihombing', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-11', nis: '240711', nisn: '0098451211', nama: 'Larasati Dewi', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-12', nis: '240712', nisn: '0098451212', nama: 'Muhammad Rizky Alfian', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-13', nis: '240713', nisn: '0098451213', nama: 'Nabila Zahra Khairunnisa', jenisKelamin: 'P', kelasId: 'k-7a' },
-  { id: 's-14', nis: '240714', nisn: '0098451214', nama: 'Rafi Al Ghifari', jenisKelamin: 'L', kelasId: 'k-7a' },
-  { id: 's-15', nis: '240715', nisn: '0098451215', nama: 'Zahra Amelia Santoso', jenisKelamin: 'P', kelasId: 'k-7a' },
+  { id: 's-1', nis: '240701', nisn: '0098451201', nama: 'Aditya Pratama Ramadhan', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-2', nis: '240702', nisn: '0098451202', nama: 'Anisa Citra Lestari', jenisKelamin: 'P', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-3', nis: '240703', nisn: '0098451203', nama: 'Bagas Satria Wibowo', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-4', nis: '240704', nisn: '0098451204', nama: 'Chelsea Aurelia Putri', jenisKelamin: 'P', agama: 'Kristen', kelasId: 'k-7a' },
+  { id: 's-5', nis: '240705', nisn: '0098451205', nama: 'Dimas Arya Nugroho', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-6', nis: '240706', nisn: '0098451206', nama: 'Fadhil Muhammad Ridwan', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-7', nis: '240707', nisn: '0098451207', nama: 'Gisella Natasha', jenisKelamin: 'P', agama: 'Katolik', kelasId: 'k-7a' },
+  { id: 's-8', nis: '240708', nisn: '0098451208', nama: 'Haikal Zikri Ilham', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-9', nis: '240709', nisn: '0098451209', nama: 'Intan Nuraini', jenisKelamin: 'P', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-10', nis: '240710', nisn: '0098451210', nama: 'Kevin Jonathan Sihombing', jenisKelamin: 'L', agama: 'Kristen', kelasId: 'k-7a' },
+  { id: 's-11', nis: '240711', nisn: '0098451211', nama: 'Larasati Dewi', jenisKelamin: 'P', agama: 'Hindu', kelasId: 'k-7a' },
+  { id: 's-12', nis: '240712', nisn: '0098451212', nama: 'Muhammad Rizky Alfian', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-13', nis: '240713', nisn: '0098451213', nama: 'Nabila Zahra Khairunnisa', jenisKelamin: 'P', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-14', nis: '240714', nisn: '0098451214', nama: 'Rafi Al Ghifari', jenisKelamin: 'L', agama: 'Islam', kelasId: 'k-7a' },
+  { id: 's-15', nis: '240715', nisn: '0098451215', nama: 'Zahra Amelia Santoso', jenisKelamin: 'P', agama: 'Islam', kelasId: 'k-7a' },
 ];
 
 export const initialSubjectConfigs: SubjectConfig[] = [
-  { kelasId: 'k-7a', mapelId: 'm-pai', namaGuru: 'Drs. H. Mulyadi, M.A.', kktp: 75, bobotFormatif: 50, bobotSumatif: 50, deskripsiMapel: 'Memahami hakikat beriman kepada kitab-kitab Allah serta meneladani perilaku jujur dan amanah.' },
+  {
+    kelasId: 'k-7a',
+    mapelId: 'm-pai',
+    namaGuru: 'Drs. H. Mulyadi, M.A.',
+    kktp: 75,
+    bobotFormatif: 50,
+    bobotSumatif: 50,
+    deskripsiMapel: 'Memahami hakikat beriman kepada kitab-kitab Allah serta meneladani perilaku jujur dan amanah.',
+    deskripsiPerAgama: {
+      Islam: 'Memahami hakikat beriman kepada kitab-kitab Allah serta meneladani perilaku jujur dan amanah.',
+      Kristen: 'Menghayati karya keselamatan Allah melalui Yesus Kristus dan mempraktikkan kasih serta keteladanan hidup beriman.',
+      Katolik: 'Memahami panggilan hidup sebagai murid Kristus dan mewujudkan nilai-nilai Kerajaan Allah dalam kehidupan sehari-hari.',
+      Hindu: 'Memahami ajaran Tri Hita Karana, Panca Sradha, serta perilaku beretika dan berbudi luhur sesuai ajaran Veda.',
+      Buddha: 'Memahami ajaran Empat Kebenaran Mulia, Hukum Karma, dan pengamalan Pancasila Buddhis dalam kehidupan bermasyarakat.',
+      Konghucu: 'Memahami kebajikan Ren (Cinta Kasih), Xiao (Bakti), serta pengamalan ajaran moral Tian dalam kehidupan beragama.',
+    },
+  },
   { kelasId: 'k-7a', mapelId: 'm-ppkn', namaGuru: 'Budi Santoso, S.Pd.', kktp: 75, bobotFormatif: 50, bobotSumatif: 50, deskripsiMapel: 'Menganalisis perumusan dan penetapan Pancasila sebagai dasar negara serta norma dalam masyarakat.' },
   { kelasId: 'k-7a', mapelId: 'm-bind', namaGuru: 'Hj. Endang Suryani, S.Pd.', kktp: 75, bobotFormatif: 50, bobotSumatif: 50, deskripsiMapel: 'Memahami ide pokok teks deskripsi dan menyajikan teks cerita fantasi dengan struktur yang runtut.' },
   { kelasId: 'k-7a', mapelId: 'm-mtk', namaGuru: 'Ahmad Fauzi, M.Pd.', kktp: 72, bobotFormatif: 50, bobotSumatif: 50, deskripsiMapel: 'Menyelesaikan operasi hitung bilangan bulat, pecahan, dan penyederhanaan bentuk aljabar.' },
@@ -212,7 +228,8 @@ export function generateInitialScores(): NilaiRecord[] {
 
   initialSiswaList.forEach((siswa, index) => {
     initialMapelList.forEach((mapel) => {
-      const config = initialSubjectConfigs.find(c => c.mapelId === mapel.id) || { kktp: 75 };
+      const config: Partial<SubjectConfig> & { kktp: number } =
+        initialSubjectConfigs.find((c) => c.mapelId === mapel.id) || { kktp: 75 };
       const range = baseScores[mapel.id] || { fMin: 75, fMax: 90, sMin: 75, sMax: 90 };
       
       // Top students get consistently higher, middle get normal
@@ -223,6 +240,18 @@ export function generateInitialScores(): NilaiRecord[] {
       const clampS = Math.max(55, Math.min(100, sVal));
       const akhir = Math.round((clampF + clampS) / 2);
 
+      let capaianText = sampleDescriptions(mapel.nama, akhir, config.kktp);
+      if (mapel.id === 'm-pai' && config.deskripsiPerAgama) {
+        const agamaMateri = config.deskripsiPerAgama[siswa.agama || 'Islam'] || config.deskripsiMapel;
+        if (akhir >= 90) {
+          capaianText = `Menunjukkan penguasaan materi yang sangat baik dalam ${agamaMateri} serta melampaui capaian pembelajaran.`;
+        } else if (akhir >= config.kktp) {
+          capaianText = `Mencapai kompetensi tujuan pembelajaran dengan baik dalam ${agamaMateri}.`;
+        } else {
+          capaianText = `Perlu bimbingan dan peningkatan pemahaman serta latihan intensif pada ${agamaMateri}.`;
+        }
+      }
+
       scores.push({
         id: `nr-${siswa.id}-${mapel.id}`,
         siswaId: siswa.id,
@@ -231,7 +260,7 @@ export function generateInitialScores(): NilaiRecord[] {
         nilaiFormatif: clampF,
         nilaiSumatif: clampS,
         nilaiAkhir: akhir,
-        capaianKompetensi: sampleDescriptions(mapel.nama, akhir, config.kktp),
+        capaianKompetensi: capaianText,
       });
     });
   });

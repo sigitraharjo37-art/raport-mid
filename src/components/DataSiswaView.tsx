@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Kelas, Siswa } from '../types/rapor';
+import { Kelas, Siswa, DAFTAR_AGAMA } from '../types/rapor';
 import {
   GraduationCap,
   Plus,
@@ -56,6 +56,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     nisn: '',
     nama: '',
     jenisKelamin: 'L',
+    agama: 'Islam',
   });
 
   const orphanStudents = siswaList.filter((s) => !kelasList.some((k) => k.id === s.kelasId));
@@ -172,6 +173,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       nisn: s.nisn,
       nama: s.nama,
       jenisKelamin: s.jenisKelamin,
+      agama: s.agama || 'Islam',
     });
   };
 
@@ -181,6 +183,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       id,
       kelasId: editKelasId || selectedKelasId,
       ...formData,
+      agama: formData.agama || 'Islam',
     });
     setEditingId(null);
   };
@@ -193,22 +196,23 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       id: newId,
       kelasId: targetKelas,
       ...formData,
+      agama: formData.agama || 'Islam',
     });
-    setFormData({ nis: '', nisn: '', nama: '', jenisKelamin: 'L' });
+    setFormData({ nis: '', nisn: '', nama: '', jenisKelamin: 'L', agama: 'Islam' });
     setIsAdding(false);
   };
 
   // Unduh format template input siswa sesuai permintaan user
-  // Kolom: No, NISN, NIS, Nama, Jenis Kelamin, kelas
+  // Kolom: No, NISN, NIS, Nama, Jenis Kelamin, Agama, kelas
   const handleDownloadFormatTemplate = () => {
     const targetKelasNama = currentKelas?.nama || 'VII-A';
     const templateData: (string | number)[][] = [
-      ['No', 'NISN', 'NIS', 'Nama', 'Jenis Kelamin', 'kelas'],
-      [1, '0098451201', '240701', 'Ahmad Fadillah Pratama', 'L', targetKelasNama],
-      [2, '0098451202', '240702', 'Aulia Rahmawati Dewi', 'P', targetKelasNama],
-      [3, '0098451203', '240703', 'Bima Satria Yudha', 'L', targetKelasNama],
-      [4, '0098451204', '240704', 'Cantika Putri Amanda', 'P', targetKelasNama],
-      [5, '0098451205', '240705', 'Daffa Danendra', 'L', targetKelasNama],
+      ['No', 'NISN', 'NIS', 'Nama', 'Jenis Kelamin', 'Agama', 'kelas'],
+      [1, '0098451201', '240701', 'Ahmad Fadillah Pratama', 'L', 'Islam', targetKelasNama],
+      [2, '0098451202', '240702', 'Aulia Rahmawati Dewi', 'P', 'Islam', targetKelasNama],
+      [3, '0098451203', '240703', 'Chelsea Aurelia Putri', 'P', 'Kristen', targetKelasNama],
+      [4, '0098451204', '240704', 'Gisella Natasha', 'P', 'Katolik', targetKelasNama],
+      [5, '0098451205', '240705', 'Larasati Dewi', 'P', 'Hindu', targetKelasNama],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(templateData);
@@ -218,6 +222,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       { wch: 12 }, // NIS
       { wch: 32 }, // Nama
       { wch: 14 }, // Jenis Kelamin
+      { wch: 14 }, // Agama
       { wch: 12 }, // kelas
     ];
 
@@ -264,6 +269,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
         const nisCol = headers.findIndex((h) => h === 'nis' && !h.includes('nisn'));
         const namaCol = headers.findIndex((h) => h === 'nama' || h.includes('nama'));
         const jkCol = headers.findIndex((h) => h.includes('jenis kelamin') || h.includes('jk') || h === 'l/p');
+        const agamaCol = headers.findIndex((h) => h.includes('agama') || h.includes('religion'));
         const kelasCol = headers.findIndex((h) => h === 'kelas' || h.includes('kelas') || h.includes('rombel'));
 
         const importedSiswa: Siswa[] = [];
@@ -290,6 +296,27 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             const rawJk = String(row[jkCol]).trim().toUpperCase();
             if (rawJk.startsWith('P') || rawJk.includes('PEREMPUAN')) {
               jkVal = 'P';
+            }
+          }
+
+          let agamaVal = 'Islam';
+          if (agamaCol !== -1 && row[agamaCol]) {
+            const rawAgama = String(row[agamaCol]).trim();
+            const matched = DAFTAR_AGAMA.find((a) => a.toLowerCase() === rawAgama.toLowerCase());
+            if (matched) {
+              agamaVal = matched;
+            } else if (/kristen|protestan/i.test(rawAgama)) {
+              agamaVal = 'Kristen';
+            } else if (/katolik/i.test(rawAgama)) {
+              agamaVal = 'Katolik';
+            } else if (/hindu/i.test(rawAgama)) {
+              agamaVal = 'Hindu';
+            } else if (/buddha|budha/i.test(rawAgama)) {
+              agamaVal = 'Buddha';
+            } else if (/konghucu|khonghucu/i.test(rawAgama)) {
+              agamaVal = 'Konghucu';
+            } else if (rawAgama) {
+              agamaVal = rawAgama;
             }
           }
 
@@ -323,6 +350,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             nisn: nisnVal || `009${Math.floor(1000000 + Math.random() * 9000000)}`,
             nama: namaVal,
             jenisKelamin: jkVal,
+            agama: agamaVal,
             kelasId: assignedKelasId,
           });
         }
@@ -577,7 +605,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           <h3 className="text-sm font-bold text-indigo-900 mb-3">
             Tambah Siswa Baru ke Kelas {currentKelas?.nama}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">NIS (Nomor Induk Siswa)</label>
               <input
@@ -617,6 +645,20 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               >
                 <option value="L">Laki-Laki (L)</option>
                 <option value="P">Perempuan (P)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Agama</label>
+              <select
+                value={formData.agama || 'Islam'}
+                onChange={(e) => setFormData({ ...formData, agama: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-indigo-900"
+              >
+                {DAFTAR_AGAMA.map((ag) => (
+                  <option key={ag} value={ag}>
+                    {ag}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -733,7 +775,8 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                 <th className="py-3 px-4 w-32">NISN</th>
                 <th className="py-3 px-4">Nama Lengkap Peserta Didik</th>
                 <th className="py-3 px-3 w-32 text-center">Rombel / Kelas</th>
-                <th className="py-3 px-4 w-20 text-center">L/P</th>
+                <th className="py-3 px-4 w-16 text-center">L/P</th>
+                <th className="py-3 px-3 w-28 text-center">Agama</th>
                 <th className="py-3 px-4 w-24 text-right">Aksi</th>
               </tr>
             </thead>
@@ -793,6 +836,19 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                         >
                           <option value="L">L</option>
                           <option value="P">P</option>
+                        </select>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <select
+                          value={formData.agama || 'Islam'}
+                          onChange={(e) => setFormData({ ...formData, agama: e.target.value })}
+                          className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-semibold focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {DAFTAR_AGAMA.map((ag) => (
+                            <option key={ag} value={ag}>
+                              {ag}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="py-2.5 px-3 text-right space-x-1">
@@ -863,6 +919,11 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                         {s.jenisKelamin}
                       </span>
                     </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        {s.agama || 'Islam'}
+                      </span>
+                    </td>
                     <td className="py-3 px-4 text-right space-x-1">
                       <button
                         onClick={() => handleStartEdit(s)}
@@ -888,7 +949,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               })}
               {filteredSiswa.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="py-8 text-center text-slate-400 text-sm">
                     Belum ada siswa di kelas ini atau tidak ditemukan.
                   </td>
                 </tr>
