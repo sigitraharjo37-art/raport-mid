@@ -22,6 +22,11 @@ export const DataKelasView: React.FC<DataKelasViewProps> = ({
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
+  // Urutkan guruList ascending (A-Z) berdasarkan nama
+  const sortedGuruList = [...guruList].sort((a, b) =>
+    a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+  );
+
   // Form states
   const [formData, setFormData] = useState<Omit<Kelas, 'id'>>({
     nama: '',
@@ -32,11 +37,12 @@ export const DataKelasView: React.FC<DataKelasViewProps> = ({
 
   const handleStartEdit = (kelas: Kelas) => {
     setIsEditing(kelas.id);
+    const matchedGuru = sortedGuruList.find((g) => g.nama === kelas.waliKelas);
     setFormData({
       nama: kelas.nama,
       tingkat: kelas.tingkat,
       waliKelas: kelas.waliKelas,
-      nipWaliKelas: kelas.nipWaliKelas,
+      nipWaliKelas: matchedGuru ? matchedGuru.nip : kelas.nipWaliKelas,
     });
   };
 
@@ -111,38 +117,35 @@ export const DataKelasView: React.FC<DataKelasViewProps> = ({
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Wali Kelas</label>
-              <input
-                type="text"
-                list="datalist-guru-wali"
+              <select
                 value={formData.waliKelas}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const matched = guruList.find((g) => g.nama === val);
+                  const matched = sortedGuruList.find((g) => g.nama === val);
                   setFormData((prev) => ({
                     ...prev,
                     waliKelas: val,
-                    nipWaliKelas: matched ? matched.nip : prev.nipWaliKelas,
+                    nipWaliKelas: matched ? matched.nip : '',
                   }));
                 }}
-                placeholder="Pilih atau ketik nama guru..."
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-              />
-              <datalist id="datalist-guru-wali">
-                {guruList.map((g) => (
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 font-medium"
+              >
+                <option value="">-- Pilih Guru Wali Kelas (A-Z) --</option>
+                {sortedGuruList.map((g) => (
                   <option key={g.id} value={g.nama}>
-                    {g.nama} (NIP. {g.nip})
+                    {g.nama} {g.nip ? `(NIP. ${g.nip})` : ''}
                   </option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">NIP Wali Kelas</label>
               <input
                 type="text"
                 value={formData.nipWaliKelas}
-                onChange={(e) => setFormData({ ...formData, nipWaliKelas: e.target.value })}
-                placeholder="19810214 200604 2 007"
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                readOnly
+                placeholder="Otomatis mengikuti nama wali kelas"
+                className="w-full px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm font-mono text-slate-700 cursor-not-allowed"
               />
             </div>
           </div>
@@ -186,30 +189,36 @@ export const DataKelasView: React.FC<DataKelasViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700">Nama Wali Kelas</label>
-                    <input
-                      type="text"
-                      list="datalist-guru-wali"
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Nama Wali Kelas</label>
+                    <select
                       value={formData.waliKelas}
                       onChange={(e) => {
                         const val = e.target.value;
-                        const matched = guruList.find((g) => g.nama === val);
+                        const matched = sortedGuruList.find((g) => g.nama === val);
                         setFormData((prev) => ({
                           ...prev,
                           waliKelas: val,
-                          nipWaliKelas: matched ? matched.nip : prev.nipWaliKelas,
+                          nipWaliKelas: matched ? matched.nip : '',
                         }));
                       }}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-sm"
-                    />
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Pilih Guru Wali Kelas (A-Z) --</option>
+                      {sortedGuruList.map((g) => (
+                        <option key={g.id} value={g.nama}>
+                          {g.nama} {g.nip ? `(NIP. ${g.nip})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700">NIP Wali Kelas</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">NIP Wali Kelas</label>
                     <input
                       type="text"
                       value={formData.nipWaliKelas}
-                      onChange={(e) => setFormData({ ...formData, nipWaliKelas: e.target.value })}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-sm"
+                      readOnly
+                      placeholder="Otomatis mengikuti nama wali kelas"
+                      className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-300 rounded-md text-sm font-mono text-slate-700 cursor-not-allowed"
                     />
                   </div>
                   <div className="flex items-center justify-end space-x-2 pt-2">

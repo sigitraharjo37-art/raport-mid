@@ -7,7 +7,6 @@ import {
   Edit2,
   Search,
   FileSpreadsheet,
-  UserPlus,
   Check,
   FileDown,
   Upload,
@@ -49,8 +48,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   const [kelasFilter, setKelasFilter] = useState<string>('ALL'); // 'ALL' shows all 431 students across school
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  const [isBatchAdding, setIsBatchAdding] = useState(false);
-  const [batchNames, setBatchNames] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editKelasId, setEditKelasId] = useState<string>(selectedKelasId);
 
@@ -199,29 +196,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     });
     setFormData({ nis: '', nisn: '', nama: '', jenisKelamin: 'L' });
     setIsAdding(false);
-  };
-
-  const handleProcessBatchAdd = () => {
-    const lines = batchNames.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) return;
-
-    const targetKelas = kelasFilter !== 'ALL' && kelasFilter !== 'UNASSIGNED' ? kelasFilter : selectedKelasId;
-    let baseNis = 240700 + filteredSiswa.length;
-    const newItems: Siswa[] = lines.map((line, idx) => {
-      baseNis += 1;
-      return {
-        id: `s-${Date.now()}-${idx}`,
-        kelasId: targetKelas,
-        nis: baseNis.toString(),
-        nisn: `009${Math.floor(1000000 + Math.random() * 9000000)}`,
-        nama: line,
-        jenisKelamin: idx % 2 === 0 ? 'L' : 'P',
-      };
-    });
-
-    onAddBatchSiswa(newItems);
-    setBatchNames('');
-    setIsBatchAdding(false);
   };
 
   // Unduh format template input siswa sesuai permintaan user
@@ -477,28 +451,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               <span>Tambah Siswa</span>
             </button>
 
-            {/* Tambah Cepat / Paste */}
-            <button
-              onClick={() => setIsBatchAdding(true)}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
-              title="Tambah Banyak Siswa Sekaligus"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Tambah Cepat</span>
-            </button>
-
-            {/* Hapus Semua Siswa Demo */}
-            {onPurgeDemoSiswa && siswaList.some((s) => s.id.startsWith('s-')) && (
-              <button
-                onClick={onPurgeDemoSiswa}
-                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition shadow-xs"
-                title="Hapus seluruh peserta didik data demo contoh bawaan secara permanen dari Cloud dan Local"
-              >
-                <Trash2 className="w-4 h-4 text-rose-600" />
-                <span>Hapus Siswa Demo</span>
-              </button>
-            )}
-
             {/* Tombol Hapus Massal */}
             <button
               onClick={() => {
@@ -682,38 +634,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             >
               <Check className="w-3.5 h-3.5" />
               <span>Simpan Siswa</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Add Modal */}
-      {isBatchAdding && (
-        <div className="bg-slate-50 border border-slate-300 rounded-2xl p-5 shadow-xs">
-          <h3 className="text-sm font-bold text-slate-800 mb-1">Tambah Banyak Siswa Cepat (Paste Baris Nama)</h3>
-          <p className="text-xs text-slate-500 mb-3">
-            Tuliskan atau paste satu nama per baris. NIS & NISN akan di-generate otomatis dan dapat disesuaikan kemudian.
-          </p>
-          <textarea
-            rows={5}
-            value={batchNames}
-            onChange={(e) => setBatchNames(e.target.value)}
-            placeholder="Ahmad Zaki&#10;Bella Safira&#10;Dedi Kurniawan"
-            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500"
-          />
-          <div className="mt-3 flex items-center justify-end space-x-2">
-            <button
-              onClick={() => setIsBatchAdding(false)}
-              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg"
-            >
-              Batal
-            </button>
-            <button
-              onClick={handleProcessBatchAdd}
-              disabled={!batchNames.trim()}
-              className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50"
-            >
-              Proses Tambahkan Siswa
             </button>
           </div>
         </div>
