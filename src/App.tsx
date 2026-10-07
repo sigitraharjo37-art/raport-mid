@@ -46,6 +46,7 @@ import {
   savePresensiCloud,
   deleteGuruCloud,
   deleteSiswaCloud,
+  deleteBatchSiswaCloud,
   deleteKelasCloud,
   deleteMapelCloud,
   purgeAllDemoGurusCloud,
@@ -190,6 +191,12 @@ export default function App() {
     setSelectedKelasId(newK.id);
   };
 
+  const handleAddBatchKelas = (newClasses: Kelas[]) => {
+    const updated = [...kelasList, ...newClasses];
+    setKelasList(updated);
+    saveKelasCloud(updated);
+  };
+
   const handleUpdateKelas = (updatedK: Kelas) => {
     const updated = kelasList.map((k) => (k.id === updatedK.id ? updatedK : k));
     setKelasList(updated);
@@ -257,6 +264,24 @@ export default function App() {
     saveScores(updatedScores);
 
     const updatedPresensi = presensiList.filter((p) => p.siswaId !== id);
+    setPresensiList(updatedPresensi);
+    savePresensi(updatedPresensi);
+  };
+
+  const handleDeleteBatchSiswa = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const updated = siswaList.filter((s) => !idSet.has(s.id));
+    setSiswaList(updated);
+    saveSiswaList(updated);
+    await deleteBatchSiswaCloud(ids);
+
+    // Also remove local scores and presensi for these students
+    const updatedScores = scoresList.filter((sc) => !idSet.has(sc.siswaId));
+    setScoresList(updatedScores);
+    saveScores(updatedScores);
+
+    const updatedPresensi = presensiList.filter((p) => !idSet.has(p.siswaId));
     setPresensiList(updatedPresensi);
     savePresensi(updatedPresensi);
   };
@@ -520,7 +545,9 @@ export default function App() {
               onUpdateSiswa={handleUpdateSiswa}
               onDeleteSiswa={handleDeleteSiswa}
               onAddBatchSiswa={handleAddBatchSiswa}
+              onDeleteBatchSiswa={handleDeleteBatchSiswa}
               onPurgeDemoSiswa={handlePurgeAllDemoSiswa}
+              onAddBatchKelas={handleAddBatchKelas}
             />
           )}
 

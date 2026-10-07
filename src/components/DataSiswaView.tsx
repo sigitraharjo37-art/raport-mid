@@ -11,6 +11,9 @@ import {
   Check,
   FileDown,
   Upload,
+  CheckSquare,
+  Square,
+  AlertTriangle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -23,7 +26,9 @@ interface DataSiswaViewProps {
   onUpdateSiswa: (siswa: Siswa) => void;
   onDeleteSiswa: (siswaId: string) => void;
   onAddBatchSiswa: (newSiswa: Siswa[]) => void;
+  onDeleteBatchSiswa?: (siswaIds: string[]) => void;
   onPurgeDemoSiswa?: () => void;
+  onAddBatchKelas?: (newClasses: Kelas[]) => void;
 }
 
 export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
@@ -35,13 +40,19 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   onUpdateSiswa,
   onDeleteSiswa,
   onAddBatchSiswa,
+  onDeleteBatchSiswa,
   onPurgeDemoSiswa,
+  onAddBatchKelas,
 }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [kelasFilter, setKelasFilter] = useState<string>('ALL'); // 'ALL' shows all 431 students across school
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isBatchAdding, setIsBatchAdding] = useState(false);
   const [batchNames, setBatchNames] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editKelasId, setEditKelasId] = useState<string>(selectedKelasId);
 
   const [formData, setFormData] = useState<Omit<Siswa, 'id' | 'kelasId'>>({
     nis: '',
@@ -50,21 +61,115 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     jenisKelamin: 'L',
   });
 
+  const orphanStudents = siswaList.filter((s) => !kelasList.some((k) => k.id === s.kelasId));
+
   const filteredSiswa = siswaList
-    .filter((s) => s.kelasId === selectedKelasId)
+    .filter((s) => {
+      if (kelasFilter === 'ALL') return true;
+      if (kelasFilter === 'UNASSIGNED') {
+        return !kelasList.some((k) => k.id === s.kelasId);
+      }
+      return s.kelasId === kelasFilter;
+    })
     .filter((s) => {
       const q = searchQuery.toLowerCase();
+      const matchedKelas = kelasList.find((k) => k.id === s.kelasId);
       return (
         s.nama.toLowerCase().includes(q) ||
         s.nis.toLowerCase().includes(q) ||
-        s.nisn.toLowerCase().includes(q)
+        s.nisn.toLowerCase().includes(q) ||
+        (matchedKelas && matchedKelas.nama.toLowerCase().includes(q))
       );
     });
 
-  const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
+  const currentKelas =
+    kelasList.find(
+      (k) =>
+        k.id ===
+        (kelasFilter === 'ALL' || kelasFilter === 'UNASSIGNED'
+          ? selectedKelasId
+          : kelasFilter)
+    ) || kelasList[0];
+
+  const isAllSelected =
+    filteredSiswa.length > 0 &&
+    filteredSiswa.every((s) => selectedIds.includes(s.id));
+
+  const isSomeSelected =
+    filteredSiswa.some((s) => selectedIds.includes(s.id)) && !isAllSelected;
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      const visibleIdSet = new Set(filteredSiswa.map((s) => s.id));
+      setSelectedIds((prev) => prev.filter((id) => !visibleIdSet.has(id)));
+    } else {
+      const visibleIds = filteredSiswa.map((s) => s.id);
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleExecuteBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (
+      !confirm(
+        `PERINGATAN HAPUS MASSAL:\n\nApakah Anda yakin ingin MENGHAPUS PERMANEN ${count} data peserta didik terpilih beserta seluruh rekam nilai dan catatan mereka dari Cloud Database dan Penyimpanan Lokal?\n\nTindakan ini tidak dapat dibatalkan.`
+      )
+    ) {
+      return;
+    }
+
+    if (onDeleteBatchSiswa) {
+      onDeleteBatchSiswa(selectedIds);
+    } else {
+      selectedIds.forEach((id) => onDeleteSiswa(id));
+    }
+
+    setSelectedIds([]);
+    setIsBulkDeleteModalOpen(false);
+    alert(`Berhasil menghapus ${count} data peserta didik secara permanen dari Cloud dan Lokal.`);
+  };
+
+  const handleDeleteAllInCurrentClass = () => {
+    const classStudents = siswaList.filter((s) => s.kelasId === selectedKelasId);
+    if (classStudents.length === 0) {
+      alert(`Tidak ada siswa di Kelas ${currentKelas?.nama}.`);
+      return;
+    }
+
+    if (
+      !confirm(
+        `PERINGATAN HAPUS SELURUH KELAS:\n\nAnda akan MENGHAPUS SEMUA ${classStudents.length} peserta didik di Kelas ${currentKelas?.nama} beserta seluruh nilainya secara permanen!\n\nLanjutkan penghapusan massal?`
+      )
+    ) {
+      return;
+    }
+
+    const ids = classStudents.map((s) => s.id);
+    if (onDeleteBatchSiswa) {
+      onDeleteBatchSiswa(ids);
+    } else {
+      ids.forEach((id) => onDeleteSiswa(id));
+    }
+
+    setSelectedIds([]);
+    setIsBulkDeleteModalOpen(false);
+    alert(`Berhasil menghapus seluruh (${classStudents.length}) data siswa di Kelas ${currentKelas?.nama}.`);
+  };
 
   const handleStartEdit = (s: Siswa) => {
     setEditingId(s.id);
+    setEditKelasId(s.kelasId);
     setFormData({
       nis: s.nis,
       nisn: s.nisn,
@@ -77,7 +182,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     if (!formData.nama.trim()) return;
     onUpdateSiswa({
       id,
-      kelasId: selectedKelasId,
+      kelasId: editKelasId || selectedKelasId,
       ...formData,
     });
     setEditingId(null);
@@ -85,10 +190,11 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
 
   const handleSaveAdd = () => {
     if (!formData.nama.trim()) return;
+    const targetKelas = kelasFilter !== 'ALL' && kelasFilter !== 'UNASSIGNED' ? kelasFilter : selectedKelasId;
     const newId = `s-${Date.now()}`;
     onAddSiswa({
       id: newId,
-      kelasId: selectedKelasId,
+      kelasId: targetKelas,
       ...formData,
     });
     setFormData({ nis: '', nisn: '', nama: '', jenisKelamin: 'L' });
@@ -99,12 +205,13 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     const lines = batchNames.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
 
+    const targetKelas = kelasFilter !== 'ALL' && kelasFilter !== 'UNASSIGNED' ? kelasFilter : selectedKelasId;
     let baseNis = 240700 + filteredSiswa.length;
     const newItems: Siswa[] = lines.map((line, idx) => {
       baseNis += 1;
       return {
         id: `s-${Date.now()}-${idx}`,
-        kelasId: selectedKelasId,
+        kelasId: targetKelas,
         nis: baseNis.toString(),
         nisn: `009${Math.floor(1000000 + Math.random() * 9000000)}`,
         nama: line,
@@ -131,7 +238,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(templateData);
-    // Set column widths
     ws['!cols'] = [
       { wch: 6 },  // No
       { wch: 16 }, // NISN
@@ -146,7 +252,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     XLSX.writeFile(wb, `Format_Input_Siswa_Kelas_${targetKelasNama}.xlsx`);
   };
 
-  // Impor file Excel berdasarkan format template
+  // Impor file Excel berdasarkan format template dengan auto-detect & auto-create rombel kelas baru
   const handleImportExcelTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -187,6 +293,12 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
         const kelasCol = headers.findIndex((h) => h === 'kelas' || h.includes('kelas') || h.includes('rombel'));
 
         const importedSiswa: Siswa[] = [];
+        const newClassesToCreate: Kelas[] = [];
+        const currentClassesMap = new Map<string, Kelas>();
+        kelasList.forEach((k) => {
+          currentClassesMap.set(k.nama.toLowerCase().replace(/[^a-z0-9]/g, ''), k);
+        });
+
         let autoNis = 240750;
 
         for (let i = headerRowIdx + 1; i < rows.length; i++) {
@@ -207,15 +319,27 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             }
           }
 
-          // Tentukan kelas
+          // Tentukan atau buat kelas otomatis
           let assignedKelasId = selectedKelasId;
           if (kelasCol !== -1 && row[kelasCol]) {
-            const rawKelas = String(row[kelasCol]).trim().toLowerCase();
-            const matchedKelas = kelasList.find(
-              (k) => k.nama.toLowerCase() === rawKelas || k.nama.toLowerCase().replace(/[^a-z0-9]/g, '') === rawKelas.replace(/[^a-z0-9]/g, '')
-            );
-            if (matchedKelas) {
-              assignedKelasId = matchedKelas.id;
+            const rawKelas = String(row[kelasCol]).trim();
+            const cleanKey = rawKelas.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            if (currentClassesMap.has(cleanKey)) {
+              assignedKelasId = currentClassesMap.get(cleanKey)!.id;
+            } else {
+              // Kelas baru terdeteksi di Excel (misal: VII-C, VII-D, dsb)
+              const newKId = `k-${cleanKey || Date.now()}`;
+              const createdK: Kelas = {
+                id: newKId,
+                nama: rawKelas.toUpperCase(),
+                tingkat: rawKelas.match(/\d/)?.[0] || '7',
+                waliKelas: 'Belum Ditentukan',
+                nipWaliKelas: '-',
+              };
+              currentClassesMap.set(cleanKey, createdK);
+              newClassesToCreate.push(createdK);
+              assignedKelasId = newKId;
             }
           }
 
@@ -229,9 +353,23 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           });
         }
 
+        if (newClassesToCreate.length > 0 && onAddBatchKelas) {
+          onAddBatchKelas(newClassesToCreate);
+        }
+
         if (importedSiswa.length > 0) {
           onAddBatchSiswa(importedSiswa);
-          alert(`Berhasil mengimpor ${importedSiswa.length} data siswa dari file Excel!`);
+          setKelasFilter('ALL'); // Beralih ke tampilan SEMUA KELAS agar langsung terlihat 400+ siswa!
+          alert(
+            `Berhasil mengimpor ${importedSiswa.length} data siswa dari file Excel!\n\n` +
+            `Siswa otomatis ditempatkan ke masing-masing rombel kelas.${
+              newClassesToCreate.length > 0
+                ? `\n${newClassesToCreate.length} rombel kelas baru otomatis dibuat (${newClassesToCreate
+                    .map((k) => k.nama)
+                    .join(', ')}).`
+                : ''
+            }\n\nSeluruh data kini langsung tampil di tabel pada mode "SEMUA KELAS".`
+          );
         } else {
           alert('Tidak ditemukan baris data siswa yang valid pada file tersebut.');
         }
@@ -244,112 +382,240 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   };
 
   const handleExportExcel = () => {
-    const data = filteredSiswa.map((s, idx) => ({
-      No: idx + 1,
-      NISN: s.nisn,
-      NIS: s.nis,
-      Nama: s.nama,
-      'Jenis Kelamin': s.jenisKelamin,
-      kelas: currentKelas?.nama || '',
-    }));
+    const data = filteredSiswa.map((s, idx) => {
+      const sKelas = kelasList.find((k) => k.id === s.kelasId);
+      return {
+        No: idx + 1,
+        NISN: s.nisn,
+        NIS: s.nis,
+        Nama: s.nama,
+        'Jenis Kelamin': s.jenisKelamin,
+        kelas: sKelas ? sKelas.nama : 'Tanpa Rombel',
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Data Siswa ${currentKelas?.nama}`);
-    XLSX.writeFile(wb, `Data_Siswa_Kelas_${currentKelas?.nama || 'Kelas'}.xlsx`);
+    const title = kelasFilter === 'ALL' ? 'Semua_Kelas' : currentKelas?.nama || 'Kelas';
+    XLSX.utils.book_append_sheet(wb, ws, `Data Siswa ${title}`);
+    XLSX.writeFile(wb, `Data_Siswa_${title}.xlsx`);
   };
 
   return (
     <div className="space-y-6">
       {/* Top Banner & Filter */}
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center space-x-2">
-            <GraduationCap className="w-6 h-6 text-indigo-600" />
-            <span>Data Peserta Didik (Siswa)</span>
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Daftar siswa terdaftar di setiap rombel kelas, NISN, NIS, dan jenis kelamin.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Kelas Selector */}
-          <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-            <span className="text-xs font-semibold text-slate-500 pl-2">Kelas:</span>
-            <select
-              value={selectedKelasId}
-              onChange={(e) => onSelectKelas(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-indigo-700 shadow-xs focus:ring-2 focus:ring-indigo-500"
-            >
-              {kelasList.map((k) => (
-                <option key={k.id} value={k.id}>
-                  Kelas {k.nama} ({k.waliKelas})
-                </option>
-              ))}
-            </select>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center space-x-2">
+              <GraduationCap className="w-6 h-6 text-indigo-600" />
+              <span>Data Peserta Didik (Siswa)</span>
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Daftar seluruh siswa terdaftar di sekolah, rombel kelas, NISN, NIS, dan jenis kelamin.
+            </p>
           </div>
 
-          {/* Unduh Format Input Siswa */}
-          <button
-            onClick={handleDownloadFormatTemplate}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl transition shadow-xs"
-            title="Unduh Format Excel Input Siswa (No, NISN, NIS, Nama, Jenis Kelamin, kelas)"
-          >
-            <FileDown className="w-4 h-4 text-amber-600" />
-            <span>Unduh Format Siswa</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Rombel Kelas Selector */}
+            <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+              <span className="text-xs font-semibold text-slate-500 pl-2">Filter Rombel:</span>
+              <select
+                value={kelasFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setKelasFilter(val);
+                  if (val !== 'ALL' && val !== 'UNASSIGNED') {
+                    onSelectKelas(val);
+                  }
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-indigo-700 shadow-xs focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="ALL">🌟 SEMUA KELAS ({siswaList.length} Siswa)</option>
+                {kelasList.map((k) => {
+                  const count = siswaList.filter((s) => s.kelasId === k.id).length;
+                  return (
+                    <option key={k.id} value={k.id}>
+                      Kelas {k.nama} ({count} Siswa)
+                    </option>
+                  );
+                })}
+                {orphanStudents.length > 0 && (
+                  <option value="UNASSIGNED">
+                    ⚠️ Belum Terdaftar di Rombel ({orphanStudents.length} Siswa)
+                  </option>
+                )}
+              </select>
+            </div>
 
-          {/* Impor Format Excel */}
-          <label
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
-            title="Impor Data Siswa dari format Excel yang sudah diisi"
-          >
-            <Upload className="w-4 h-4 text-indigo-600" />
-            <span>Impor Excel</span>
-            <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTemplate} className="hidden" />
-          </label>
-
-          {/* Tambah Siswa Baru */}
-          <button
-            onClick={() => setIsAdding(true)}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Siswa</span>
-          </button>
-
-          {/* Tambah Cepat / Paste */}
-          <button
-            onClick={() => setIsBatchAdding(true)}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
-            title="Tambah Banyak Siswa Sekaligus"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Tambah Cepat</span>
-          </button>
-
-          {/* Hapus Semua Siswa Demo */}
-          {onPurgeDemoSiswa && siswaList.some((s) => s.id.startsWith('s-')) && (
+            {/* Unduh Format Input Siswa */}
             <button
-              onClick={onPurgeDemoSiswa}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition shadow-xs"
-              title="Hapus seluruh peserta didik data demo contoh bawaan secara permanen dari Cloud dan Local"
+              onClick={handleDownloadFormatTemplate}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl transition shadow-xs"
+              title="Unduh Format Excel Input Siswa (No, NISN, NIS, Nama, Jenis Kelamin, kelas)"
+            >
+              <FileDown className="w-4 h-4 text-amber-600" />
+              <span>Unduh Format Siswa</span>
+            </button>
+
+            {/* Impor Format Excel */}
+            <label
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+              title="Impor Data Siswa dari format Excel yang sudah diisi"
+            >
+              <Upload className="w-4 h-4 text-indigo-600" />
+              <span>Impor Excel</span>
+              <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTemplate} className="hidden" />
+            </label>
+
+            {/* Tambah Siswa Baru */}
+            <button
+              onClick={() => setIsAdding(true)}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Siswa</span>
+            </button>
+
+            {/* Tambah Cepat / Paste */}
+            <button
+              onClick={() => setIsBatchAdding(true)}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+              title="Tambah Banyak Siswa Sekaligus"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Tambah Cepat</span>
+            </button>
+
+            {/* Hapus Semua Siswa Demo */}
+            {onPurgeDemoSiswa && siswaList.some((s) => s.id.startsWith('s-')) && (
+              <button
+                onClick={onPurgeDemoSiswa}
+                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition shadow-xs"
+                title="Hapus seluruh peserta didik data demo contoh bawaan secara permanen dari Cloud dan Local"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Hapus Siswa Demo</span>
+              </button>
+            )}
+
+            {/* Tombol Hapus Massal */}
+            <button
+              onClick={() => {
+                if (selectedIds.length > 0) {
+                  handleExecuteBulkDelete();
+                } else {
+                  setIsBulkDeleteModalOpen(true);
+                }
+              }}
+              className={`inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold rounded-xl transition shadow-xs ${
+                selectedIds.length > 0
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 shadow-md'
+                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300'
+              }`}
+              title="Hapus massal siswa yang dicentang atau seluruh siswa di kelas ini"
             >
               <Trash2 className="w-4 h-4 text-rose-600" />
-              <span>Hapus Siswa Demo</span>
+              <span>
+                Hapus Massal
+                {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+              </span>
+            </button>
+
+            {/* Ekspor Excel */}
+            <button
+              onClick={handleExportExcel}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition shadow-xs"
+              title="Ekspor data siswa saat ini ke Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Ekspor</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Ringkasan Statistik Siswa Sekolah */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+          <div
+            onClick={() => setKelasFilter('ALL')}
+            className={`p-3 rounded-xl border cursor-pointer transition ${
+              kelasFilter === 'ALL'
+                ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400'
+                : 'bg-slate-50/70 border-slate-200 hover:bg-indigo-50/40'
+            }`}
+          >
+            <p className="text-[11px] font-bold text-slate-500 uppercase">Total Siswa Terdata</p>
+            <p className="text-xl font-black text-indigo-900 mt-0.5">
+              {siswaList.length} <span className="text-xs font-semibold text-indigo-600">Siswa</span>
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
+            <p className="text-[11px] font-bold text-slate-500 uppercase">Total Rombel Kelas</p>
+            <p className="text-xl font-black text-slate-800 mt-0.5">
+              {kelasList.length} <span className="text-xs font-semibold text-slate-500">Rombel</span>
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
+            <p className="text-[11px] font-bold text-slate-500 uppercase">Laki-Laki (L)</p>
+            <p className="text-xl font-black text-blue-700 mt-0.5">
+              {siswaList.filter((s) => s.jenisKelamin === 'L').length} <span className="text-xs font-semibold text-slate-500">Siswa</span>
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
+            <p className="text-[11px] font-bold text-slate-500 uppercase">Perempuan (P)</p>
+            <p className="text-xl font-black text-pink-700 mt-0.5">
+              {siswaList.filter((s) => s.jenisKelamin === 'P').length} <span className="text-xs font-semibold text-slate-500">Siswa</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Filter Rombel Chips */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 text-xs pt-1">
+          <span className="text-slate-400 font-semibold shrink-0 pr-1">Pilih Rombel:</span>
+          <button
+            onClick={() => setKelasFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 ${
+              kelasFilter === 'ALL'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            🌟 Semua Kelas ({siswaList.length})
+          </button>
+          {kelasList.map((k) => {
+            const count = siswaList.filter((s) => s.kelasId === k.id).length;
+            return (
+              <button
+                key={k.id}
+                onClick={() => {
+                  setKelasFilter(k.id);
+                  onSelectKelas(k.id);
+                }}
+                className={`px-3 py-1.5 rounded-xl font-semibold transition shrink-0 ${
+                  kelasFilter === k.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Kelas {k.nama} ({count})
+              </button>
+            );
+          })}
+          {orphanStudents.length > 0 && (
+            <button
+              onClick={() => setKelasFilter('UNASSIGNED')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 ${
+                kelasFilter === 'UNASSIGNED'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+              }`}
+            >
+              ⚠️ Tanpa Rombel ({orphanStudents.length})
             </button>
           )}
-
-          {/* Ekspor Excel */}
-          <button
-            onClick={handleExportExcel}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition shadow-xs"
-            title="Ekspor seluruh data siswa kelas saat ini ke Excel"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Ekspor</span>
-          </button>
         </div>
       </div>
 
@@ -453,6 +719,47 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
         </div>
       )}
 
+      {/* Active Bulk Selection Floating Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-600 to-rose-700 text-white p-3.5 px-5 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-bold">
+              <CheckSquare className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-extrabold text-sm tracking-wide">
+                {selectedIds.length} Siswa Dipilih
+              </p>
+              <p className="text-xs text-rose-100">
+                Data yang dihapus akan terhapus permanen dari Cloud Firestore dan penyimpanan lokal.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleToggleSelectAll}
+              className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold rounded-xl transition"
+            >
+              {isAllSelected ? 'Batalkan Semua' : `Pilih Semua (${filteredSiswa.length})`}
+            </button>
+            <button
+              onClick={handleClearSelection}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl transition"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleExecuteBulkDelete}
+              className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs rounded-xl shadow-md transition"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Hapus ({selectedIds.length}) Siswa Sekarang</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search Bar & Stats */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-72">
@@ -466,8 +773,20 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           />
         </div>
 
-        <div className="text-xs text-slate-500 font-medium self-end sm:self-auto">
-          Menampilkan <span className="font-bold text-slate-800">{filteredSiswa.length}</span> siswa di Kelas {currentKelas?.nama}
+        <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium self-end sm:self-auto">
+          {selectedIds.length > 0 && (
+            <span className="font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+              {selectedIds.length} dipilih
+            </span>
+          )}
+          <span>
+            Menampilkan <span className="font-bold text-slate-800">{filteredSiswa.length}</span> siswa{' '}
+            {kelasFilter === 'ALL' ? (
+              <span className="font-extrabold text-indigo-700">(SEMUA ROMBEL KELAS)</span>
+            ) : (
+              <span>di Kelas {currentKelas?.nama}</span>
+            )}
+          </span>
         </div>
       </div>
 
@@ -477,21 +796,37 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
               <tr>
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected;
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer"
+                    title={isAllSelected ? 'Batalkan pilihan semua' : 'Pilih semua siswa di tabel ini'}
+                  />
+                </th>
                 <th className="py-3 px-4 w-12 text-center">No</th>
                 <th className="py-3 px-4 w-28">NIS</th>
                 <th className="py-3 px-4 w-32">NISN</th>
                 <th className="py-3 px-4">Nama Lengkap Peserta Didik</th>
-                <th className="py-3 px-4 w-24 text-center">L/P</th>
+                <th className="py-3 px-3 w-32 text-center">Rombel / Kelas</th>
+                <th className="py-3 px-4 w-20 text-center">L/P</th>
                 <th className="py-3 px-4 w-24 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredSiswa.map((s, idx) => {
                 const isCurrentEditing = editingId === s.id;
+                const isSelected = selectedIds.includes(s.id);
+                const matchedKelas = kelasList.find((k) => k.id === s.kelasId);
 
                 if (isCurrentEditing) {
                   return (
                     <tr key={s.id} className="bg-amber-50/70">
+                      <td className="py-2.5 px-3 text-center text-slate-300">-</td>
                       <td className="py-2.5 px-3 text-center text-xs font-mono">{idx + 1}</td>
                       <td className="py-2.5 px-3">
                         <input
@@ -516,6 +851,19 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                           onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-sm font-semibold"
                         />
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <select
+                          value={editKelasId}
+                          onChange={(e) => setEditKelasId(e.target.value)}
+                          className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-semibold focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {kelasList.map((k) => (
+                            <option key={k.id} value={k.id}>
+                              Kelas {k.nama}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <select
@@ -546,7 +894,21 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                 }
 
                 return (
-                  <tr key={s.id} className="hover:bg-slate-50 transition">
+                  <tr
+                    key={s.id}
+                    className={`transition ${
+                      isSelected ? 'bg-rose-50/70 border-l-4 border-l-rose-500' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-3 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(s.id)}
+                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer"
+                        title={`Pilih ${s.nama}`}
+                      />
+                    </td>
                     <td className="py-3 px-4 text-center font-mono text-xs text-slate-400 font-semibold">
                       {idx + 1}
                     </td>
@@ -558,6 +920,17 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                     </td>
                     <td className="py-3 px-4 font-bold text-slate-800">
                       {s.nama}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold border ${
+                          matchedKelas
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : 'bg-amber-50 text-amber-800 border-amber-300'
+                        }`}
+                      >
+                        {matchedKelas ? `Kelas ${matchedKelas.nama}` : '⚠️ Tanpa Rombel'}
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
@@ -595,7 +968,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               })}
               {filteredSiswa.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
+                  <td colSpan={8} className="py-8 text-center text-slate-400 text-sm">
                     Belum ada siswa di kelas ini atau tidak ditemukan.
                   </td>
                 </tr>
@@ -604,6 +977,63 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal Pilihan Hapus Massal */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scale-up space-y-4">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">Menu Hapus Massal Siswa</h3>
+                <p className="text-xs text-slate-500">Pilih opsi penghapusan yang Anda butuhkan</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                onClick={() => {
+                  handleToggleSelectAll();
+                  setIsBulkDeleteModalOpen(false);
+                }}
+                className="w-full p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left text-xs font-semibold text-slate-800 flex items-center justify-between transition"
+              >
+                <div>
+                  <div className="font-bold text-sm text-slate-900">Centang Semua Siswa Kelas {currentKelas?.nama}</div>
+                  <div className="text-slate-500 text-[11px] mt-0.5">
+                    Pilih {filteredSiswa.length} siswa untuk kemudian ditinjau sebelum dihapus.
+                  </div>
+                </div>
+                <CheckSquare className="w-5 h-5 text-indigo-600 shrink-0 ml-2" />
+              </button>
+
+              <button
+                onClick={handleDeleteAllInCurrentClass}
+                className="w-full p-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-left text-xs font-semibold text-rose-900 flex items-center justify-between transition"
+              >
+                <div>
+                  <div className="font-bold text-sm text-rose-700">Hapus Semua Siswa di Kelas {currentKelas?.nama}</div>
+                  <div className="text-rose-600 text-[11px] mt-0.5">
+                    Hapus langsung seluruh ({filteredSiswa.length}) siswa di kelas ini beserta nilai & presensinya.
+                  </div>
+                </div>
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 ml-2" />
+              </button>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

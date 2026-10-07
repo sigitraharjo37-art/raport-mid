@@ -414,6 +414,52 @@ export async function deleteSiswaCloud(siswaId: string) {
 }
 
 /**
+ * Permanently deletes multiple Siswa documents, their scores, and presensi from Cloud Firestore.
+ */
+export async function deleteBatchSiswaCloud(siswaIds: string[]) {
+  if (siswaIds.length === 0) return;
+  try {
+    const siswaIdSet = new Set(siswaIds);
+
+    // 1. Delete student docs in chunks
+    const chunkSize = 400;
+    for (let i = 0; i < siswaIds.length; i += chunkSize) {
+      const chunk = siswaIds.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((id) => {
+        batch.delete(doc(db, 'siswa', id));
+      });
+      await batch.commit();
+    }
+
+    // 2. Delete all related scores from cloud in chunks
+    const scoresSnap = await getDocs(collection(db, 'scores'));
+    const scoreDocsToDelete = scoresSnap.docs.filter((d) => siswaIdSet.has(d.data().siswaId));
+    for (let i = 0; i < scoreDocsToDelete.length; i += chunkSize) {
+      const chunk = scoreDocsToDelete.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    // 3. Delete related presensi from cloud in chunks
+    const presensiSnap = await getDocs(collection(db, 'presensi'));
+    const presDocsToDelete = presensiSnap.docs.filter((d) => {
+      const data = d.data();
+      return siswaIdSet.has(data.siswaId);
+    });
+    for (let i = 0; i < presDocsToDelete.length; i += chunkSize) {
+      const chunk = presDocsToDelete.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (e) {
+    console.error('Error deleting batch siswa from cloud:', e);
+  }
+}
+
+/**
  * Permanently deletes a Kelas from Firestore.
  */
 export async function deleteKelasCloud(kelasId: string) {
