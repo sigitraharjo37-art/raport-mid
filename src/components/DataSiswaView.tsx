@@ -551,52 +551,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             </p>
           </div>
         </div>
-
-        {/* Quick Filter Rombel Chips */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 text-xs pt-1">
-          <span className="text-slate-400 font-semibold shrink-0 pr-1">Pilih Rombel:</span>
-          <button
-            onClick={() => setKelasFilter('ALL')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 ${
-              kelasFilter === 'ALL'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            🌟 Semua Kelas ({siswaList.length})
-          </button>
-          {kelasList.map((k) => {
-            const count = siswaList.filter((s) => s.kelasId === k.id).length;
-            return (
-              <button
-                key={k.id}
-                onClick={() => {
-                  setKelasFilter(k.id);
-                  onSelectKelas(k.id);
-                }}
-                className={`px-3 py-1.5 rounded-xl font-semibold transition shrink-0 ${
-                  kelasFilter === k.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Kelas {k.nama} ({count})
-              </button>
-            );
-          })}
-          {orphanStudents.length > 0 && (
-            <button
-              onClick={() => setKelasFilter('UNASSIGNED')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition shrink-0 ${
-                kelasFilter === 'UNASSIGNED'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-              }`}
-            >
-              ⚠️ Tanpa Rombel ({orphanStudents.length})
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Add Single Form */}

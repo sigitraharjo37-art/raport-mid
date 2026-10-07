@@ -14,6 +14,7 @@ import {
   Percent,
   FileText,
   BookOpen,
+  RotateCcw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -128,9 +129,9 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         };
       } else {
         temp[s.id] = {
-          formatif: 75,
-          sumatif: 75,
-          akhir: 75,
+          formatif: 0,
+          sumatif: 0,
+          akhir: 0,
           capaian: '',
         };
       }
@@ -142,7 +143,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const handleScoreChange = (siswaId: string, field: 'formatif' | 'sumatif', val: number) => {
     const clampedVal = Math.max(0, Math.min(100, val || 0));
     setLocalScores((prev) => {
-      const current = prev[siswaId] || { formatif: 75, sumatif: 75, akhir: 75, capaian: '' };
+      const current = prev[siswaId] || { formatif: 0, sumatif: 0, akhir: 0, capaian: '' };
       const nextFormatif = field === 'formatif' ? clampedVal : current.formatif;
       const nextSumatif = field === 'sumatif' ? clampedVal : current.sumatif;
       const calculatedAkhir = calculateAkhir(nextFormatif, nextSumatif);
@@ -185,6 +186,12 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         const agamaMateri = deskripsiPerAgama[sAgama]?.trim();
         const materiText = agamaMateri || deskripsiMapel.trim() || `materi pokok dan capaian pembelajaran ${mapelName}`;
 
+        // Jika nilai masih 0 (belum dinilai), kosongkan capaian
+        if (akhir === 0) {
+          updated[s.id] = { ...item, capaian: '' };
+          return;
+        }
+
         let text = '';
         if (akhir >= 92) {
           text = `Menunjukkan penguasaan kompetensi yang sangat istimewa dalam ${materiText}, mampu berpikir kritis dan mandiri.`;
@@ -196,6 +203,22 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           text = `Perlu bimbingan dan pendampingan intensif dalam memahami konsep dasar ${materiText}.`;
         }
         updated[s.id] = { ...item, capaian: text };
+      });
+      return updated;
+    });
+  };
+
+  // Reset semua nilai siswa di kelas dan mapel saat ini menjadi 0
+  const handleResetAllToZero = () => {
+    setLocalScores((prev) => {
+      const updated = { ...prev };
+      currentSiswa.forEach((s) => {
+        updated[s.id] = {
+          formatif: 0,
+          sumatif: 0,
+          akhir: 0,
+          capaian: '',
+        };
       });
       return updated;
     });
@@ -240,7 +263,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
     );
 
     const updatedThisMapelScores: NilaiRecord[] = currentSiswa.map((s) => {
-      const entry = localScores[s.id] || { formatif: 75, sumatif: 75, akhir: 75, capaian: '' };
+      const entry = localScores[s.id] || { formatif: 0, sumatif: 0, akhir: 0, capaian: '' };
       return {
         id: `nr-${s.id}-${selectedMapelId}`,
         siswaId: s.id,
@@ -326,8 +349,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
             const nis = String(row[nisCol] || '').trim();
             const targetSiswa = currentSiswa.find((s) => s.nis === nis);
             if (targetSiswa) {
-              const f = fCol !== -1 && row[fCol] !== undefined ? Number(row[fCol]) : 75;
-              const s = sCol !== -1 && row[sCol] !== undefined ? Number(row[sCol]) : 75;
+              const f = fCol !== -1 && row[fCol] !== undefined ? Number(row[fCol]) : 0;
+              const s = sCol !== -1 && row[sCol] !== undefined ? Number(row[sCol]) : 0;
               const a = akhirCol !== -1 && row[akhirCol] !== undefined ? Number(row[akhirCol]) : Math.round((f + s) / 2);
               const cap = capCol !== -1 ? String(row[capCol] || '') : '';
 
@@ -383,6 +406,15 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
             >
               <Sparkles className="w-4 h-4 text-indigo-600" />
               <span>Auto Deskripsi</span>
+            </button>
+
+            <button
+              onClick={handleResetAllToZero}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl transition border border-rose-200 cursor-pointer"
+              title="Setel nilai seluruh siswa di kelas ini menjadi 0 (kosongkan)"
+            >
+              <RotateCcw className="w-4 h-4 text-rose-600" />
+              <span>Setel Nilai ke 0</span>
             </button>
 
             <button
@@ -770,8 +802,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {currentSiswa.map((s, idx) => {
-                const entry = localScores[s.id] || { formatif: 75, sumatif: 75, akhir: 75, capaian: '' };
-                const isTuntas = entry.akhir >= kktp;
+                const entry = localScores[s.id] || { formatif: 0, sumatif: 0, akhir: 0, capaian: '' };
+                const isTuntas = entry.akhir > 0 && entry.akhir >= kktp;
 
                 return (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition">
@@ -822,7 +854,11 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                     </td>
                     {/* Status KKTP */}
                     <td className="py-3 px-3 text-center">
-                      {isTuntas ? (
+                      {entry.akhir === 0 ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                          <span>Belum Dinilai</span>
+                        </span>
+                      ) : isTuntas ? (
                         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                           <CheckCircle className="w-3 h-3 text-emerald-600" />
                           <span>Tuntas</span>
