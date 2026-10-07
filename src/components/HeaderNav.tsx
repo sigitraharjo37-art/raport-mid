@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { SchoolInfo } from '../types/rapor';
-import { School, Settings, RotateCcw, Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { SchoolInfo, AuthUser } from '../types/rapor';
+import { School, Settings, RotateCcw, Download, Upload, CheckCircle2, AlertCircle, LogOut, User } from 'lucide-react';
 
 interface HeaderNavProps {
   schoolInfo: SchoolInfo;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
   onOpenSchoolSettings: () => void;
   onResetData: () => void;
   onExportJson: () => void;
@@ -12,6 +14,8 @@ interface HeaderNavProps {
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
   schoolInfo,
+  currentUser,
+  onLogout,
   onOpenSchoolSettings,
   onResetData,
   onExportJson,
@@ -45,40 +49,82 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons & User Profile */}
           <div className="flex items-center space-x-2">
-            <button
-              onClick={onOpenSchoolSettings}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
-              title="Pengaturan Data Sekolah & Kepala Sekolah"
-            >
-              <Settings className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">Data Sekolah</span>
-            </button>
+            {currentUser?.role === 'admin' && (
+              <>
+                <button
+                  onClick={onOpenSchoolSettings}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+                  title="Pengaturan Data Sekolah & Kepala Sekolah"
+                >
+                  <Settings className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">Data Sekolah</span>
+                </button>
 
-            <button
-              onClick={onExportJson}
-              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
-              title="Backup Data ke file JSON"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden md:inline">Backup</span>
-            </button>
+                <button
+                  onClick={onExportJson}
+                  className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+                  title="Backup Data ke file JSON"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden md:inline">Backup</span>
+                </button>
 
-            <label className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer" title="Restore Data dari JSON">
-              <Upload className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden md:inline">Restore</span>
-              <input type="file" accept=".json" onChange={onImportJson} className="hidden" />
-            </label>
+                <label className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer" title="Restore Data dari JSON">
+                  <Upload className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden md:inline">Restore</span>
+                  <input type="file" accept=".json" onChange={onImportJson} className="hidden" />
+                </label>
 
-            <button
-              onClick={() => setShowConfirmReset(true)}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/40 transition"
-              title="Reset ke Contoh Data Demo"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Reset Demo</span>
-            </button>
+                <button
+                  onClick={() => setShowConfirmReset(true)}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-medium border border-rose-800/40 transition"
+                  title="Reset ke Contoh Data Demo"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">Reset Demo</span>
+                </button>
+              </>
+            )}
+
+            {/* User Info Badge & Logout */}
+            {currentUser && (
+              <div className="flex items-center space-x-2 pl-2 border-l border-slate-700">
+                <div className="hidden sm:flex flex-col text-right">
+                  <span className="text-xs font-bold text-white truncate max-w-[130px]">
+                    {currentUser.nama}
+                  </span>
+                  <span className={`text-[10px] font-semibold uppercase ${
+                    currentUser.role === 'admin' ? 'text-indigo-400' : 'text-emerald-400'
+                  }`}>
+                    {currentUser.role === 'admin' ? 'Administrator' : 'Guru'}
+                  </span>
+                </div>
+                <span
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+                    currentUser.role === 'admin'
+                      ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
+                      : 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40'
+                  }`}
+                  title={`${currentUser.nama} (${currentUser.role})`}
+                >
+                  {currentUser.role === 'admin' ? 'AD' : 'GU'}
+                </span>
+
+                {/* Logout Button */}
+                {onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold transition cursor-pointer"
+                    title="Keluar dari akun (Logout)"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">Keluar</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

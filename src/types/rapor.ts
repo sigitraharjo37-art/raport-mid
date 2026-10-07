@@ -112,3 +112,11 @@ export interface LegerRow {
   jumlahTuntas: number;
   jumlahBelumTuntas: number;
 }
+
+export interface AuthUser {
+  username: string;
+  role: 'admin' | 'guru';
+  nama: string;
+  guruId?: string;
+  noHp?: string;
+}

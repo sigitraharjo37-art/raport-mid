@@ -13,6 +13,7 @@ import {
   NilaiRecord,
   PresensiCatatan,
   Guru,
+  AuthUser,
 } from './types/rapor';
 import {
   loadSchoolInfo,
@@ -65,6 +66,7 @@ import { DataSiswaView } from './components/DataSiswaView';
 import { DataKelasView } from './components/DataKelasView';
 import { DataMapelView } from './components/DataMapelView';
 import { DataSekolahModal } from './components/DataSekolahModal';
+import { LoginPage } from './components/LoginPage';
 
 export default function App() {
   // Primary States
@@ -81,6 +83,34 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedKelasId, setSelectedKelasId] = useState<string>(kelasList[0]?.id || '');
   const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('erapor_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = (user: AuthUser) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('erapor_current_user', JSON.stringify(user));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('erapor_current_user');
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Ensure selected class is valid
   useEffect(() => {
@@ -437,11 +467,24 @@ export default function App() {
     e.target.value = '';
   };
 
+  // If not logged in, show LoginPage
+  if (!currentUser) {
+    return (
+      <LoginPage
+        schoolInfo={schoolInfo}
+        guruList={guruList}
+        onLogin={handleLogin}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/70 flex flex-col font-sans">
       {/* Top Header */}
       <HeaderNav
         schoolInfo={schoolInfo}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onOpenSchoolSettings={() => setIsSchoolModalOpen(true)}
         onResetData={handleResetData}
         onExportJson={handleExportJson}
@@ -452,6 +495,8 @@ export default function App() {
         {/* Sidebar Nav */}
         <Sidebar
           activeTab={activeTab}
+          currentUser={currentUser}
+          onLogout={handleLogout}
           onTabChange={setActiveTab}
           onOpenSchoolSettings={() => setIsSchoolModalOpen(true)}
         />

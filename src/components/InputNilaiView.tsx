@@ -70,6 +70,11 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const currentMapel = mapelList.find((m) => m.id === selectedMapelId) || mapelList[0];
   const currentSiswa = siswaList.filter((s) => s.kelasId === selectedKelasId);
 
+  // Sort guru list ascending A-Z by name
+  const sortedGuruList = [...guruList].sort((a, b) =>
+    a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+  );
+
   // Komponen nilai yang aktif dari pengaturan periode tahun ajaran
   const showFormatif = schoolInfo.tampilkanFormatif ?? true;
   const showSumatif = schoolInfo.tampilkanSumatif ?? true;
@@ -499,26 +504,29 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
         <div className={`grid grid-cols-1 sm:grid-cols-2 ${isDualMode ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
           <div>
-            <label className="block text-xs font-semibold text-indigo-200 mb-1">
-              Nama Guru Pengampu
+            <label className="block text-xs font-semibold text-indigo-200 mb-1 flex items-center justify-between">
+              <span>Nama Guru Pengampu</span>
+              <span className="text-[10px] text-indigo-300 font-normal">Urut A - Z ({sortedGuruList.length} Guru)</span>
             </label>
-            <input
-              type="text"
-              list="datalist-guru-pengampu"
+            <select
               value={namaGuru}
               onChange={(e) => setNamaGuru(e.target.value)}
-              placeholder="Pilih atau ketik nama guru pengampu..."
-              className="w-full px-3 py-2 bg-slate-800/80 border border-indigo-700/60 rounded-lg text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-            />
-            {guruList && guruList.length > 0 && (
-              <datalist id="datalist-guru-pengampu">
-                {guruList.map((g) => (
-                  <option key={g.id} value={g.nama}>
-                    {g.nama} (NIP. {g.nip})
-                  </option>
-                ))}
-              </datalist>
-            )}
+              className="w-full px-3 py-2 bg-slate-800 border border-indigo-700/80 rounded-lg text-sm text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none cursor-pointer"
+            >
+              <option value="" className="bg-slate-900 text-slate-400">
+                -- Pilih Guru Pengampu (A - Z) --
+              </option>
+              {sortedGuruList.map((g) => (
+                <option key={g.id} value={g.nama} className="bg-slate-900 text-white">
+                  {g.nama} {g.nip ? `(NIP. ${g.nip})` : ''}
+                </option>
+              ))}
+              {namaGuru && !sortedGuruList.some((g) => g.nama === namaGuru) && (
+                <option value={namaGuru} className="bg-slate-900 text-amber-300">
+                  {namaGuru} (Tersimpan)
+                </option>
+              )}
+            </select>
           </div>
 
           <div>
