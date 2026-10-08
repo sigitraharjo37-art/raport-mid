@@ -48,7 +48,7 @@ interface InputNilaiViewProps {
     mapelId: string,
     updatedClassScores: NilaiRecord[],
     config: SubjectConfig
-  ) => Promise<{ success: boolean; syncedCount: number; error?: string }>;
+  ) => Promise<{ success: boolean; localOnly?: boolean; syncedCount: number; error?: string }>;
 }
 
 export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
@@ -182,15 +182,18 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
     const temp: Record<string, { formatif: number; sumatif: number; akhir: number; capaian: string }> = {};
     currentSiswa.forEach((s) => {
       const rec = scoresList.find((r) => r.siswaId === s.id && r.mapelId === selectedMapelId);
-      if (rec) {
-        const fVal = rec.nilaiFormatif;
-        const sVal = rec.nilaiSumatif;
+      if (rec && (rec.nilaiFormatif > 0 || rec.nilaiSumatif > 0 || rec.nilaiAkhir > 0 || (rec.capaianKompetensi && rec.capaianKompetensi.length > 0))) {
+        const fVal = rec.nilaiFormatif || 0;
+        const sVal = rec.nilaiSumatif || 0;
         temp[s.id] = {
           formatif: fVal,
           sumatif: sVal,
           akhir: calculateAkhir(fVal, sVal),
-          capaian: rec.capaianKompetensi,
+          capaian: rec.capaianKompetensi || '',
         };
+      } else if (!isDifferentSelection && localScores[s.id] && (localScores[s.id].formatif > 0 || localScores[s.id].sumatif > 0 || localScores[s.id].akhir > 0 || localScores[s.id].capaian)) {
+        // Pertahankan nilai input lokal yang sudah dimasukkan agar tidak ter-reset hilang oleh sync cloud
+        temp[s.id] = localScores[s.id];
       } else {
         temp[s.id] = {
           formatif: 0,
@@ -400,14 +403,16 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
     try {
       if (onSaveClassMapel) {
-        // Run with ultra-fast timeout (max 300ms) so button NEVER hangs on spinner
-        const savePromise = onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
-        const fastTimeout = new Promise<{ success: boolean; syncedCount: number; error?: string }>((resolve) =>
-          setTimeout(() => resolve({ success: true, syncedCount: updatedThisMapelScores.length }), 300)
-        );
-        const res = await Promise.race([savePromise, fastTimeout]);
-        if (!res.success) {
-          setSaveError(res.error || 'Peringatan: Berhasil disimpan lokal, namun sinkronisasi Cloud mengalami kendala jaringan');
+        const res = await onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
+        if (res.error) {
+          setSaveError(res.error);
+        } else {
+          setSaveError('');
+        }
+        if (res.localOnly) {
+          setToastMsg(`Tersimpan di perangkat lokal! (Cloud: Kuota harian habis). Data Anda tetap aman.`);
+        } else {
+          setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan terkirim ke Cloud.`);
         }
       } else {
         const otherScores = scoresList.filter(
@@ -415,20 +420,20 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         );
         onSaveConfig(newConfig);
         onSaveScores([...otherScores, ...updatedThisMapelScores]);
+        setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan.`);
       }
 
-      setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan terkirim ke Cloud.`);
       setIsSavedToast(true);
-      setTimeout(() => setIsSavedToast(false), 3500);
+      setTimeout(() => setIsSavedToast(false), 4000);
     } catch (err: any) {
       console.error(err);
-      setSaveError('Terjadi kesalahan saat mengirim ke Cloud. Nilai tetap tersimpan di perangkat lokal.');
+      setSaveError('Terjadi kesalahan saat sinkronisasi Cloud. Seluruh nilai tetap tersimpan aman di database lokal browser.');
     } finally {
       setIsSaving(false);
-      // Allow slight cooldown before releasing local saving guard
+      // Allow cooldown before releasing local saving guard
       setTimeout(() => {
         isLocalSavingRef.current = false;
-      }, 600);
+      }, 1000);
     }
   };
 
@@ -1115,9 +1120,13 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                           type="number"
                           min={0}
                           max={100}
-                          value={entry.formatif}
+                          value={entry.formatif === 0 ? '' : entry.formatif}
+                          placeholder="0"
                           onFocus={(e) => e.target.select()}
-                          onChange={(e) => handleScoreChange(s.id, 'formatif', Number(e.target.value))}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            handleScoreChange(s.id, 'formatif', Number.isNaN(val) ? 0 : val);
+                          }}
                           className="w-20 px-2.5 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
                         />
                       </td>
@@ -1129,9 +1138,13 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                           type="number"
                           min={0}
                           max={100}
-                          value={entry.sumatif}
+                          value={entry.sumatif === 0 ? '' : entry.sumatif}
+                          placeholder="0"
                           onFocus={(e) => e.target.select()}
-                          onChange={(e) => handleScoreChange(s.id, 'sumatif', Number(e.target.value))}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            handleScoreChange(s.id, 'sumatif', Number.isNaN(val) ? 0 : val);
+                          }}
                           className="w-20 px-2.5 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
                         />
                       </td>

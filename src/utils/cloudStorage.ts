@@ -54,57 +54,33 @@ export interface CloudSyncState {
 
 /**
  * Initializes Firestore connection and seeds initial data if cloud is completely empty.
+ * Guarded to run only once per device to conserve read quota.
  */
 export async function initializeCloudDatabase(): Promise<boolean> {
+  const initKey = 'erapor_cloud_initialized_guard_v3';
+  if (localStorage.getItem(initKey) === 'true') {
+    return true;
+  }
+
   try {
     await testFirestoreConnection();
 
-    // 1. Ensure school info exists in cloud
-    const schoolDoc = await getDoc(doc(db, 'schoolInfo', 'main'));
-    if (!schoolDoc.exists()) {
-      await saveSchoolInfoCloud(loadSchoolInfo());
-    }
-
-    // 2. Ensure mapel collection exists and is seeded in cloud
-    const mapelSnap = await getDocs(collection(db, 'mapel'));
-    if (mapelSnap.empty) {
-      const currentMapel = loadMapelList();
-      if (currentMapel.length > 0) {
-        await saveMapelCloud(currentMapel);
+    // Ensure school info exists in cloud
+    try {
+      const schoolDoc = await getDoc(doc(db, 'schoolInfo', 'main'));
+      if (!schoolDoc.exists()) {
+        await saveSchoolInfoCloud(loadSchoolInfo());
       }
+    } catch (e) {
+      console.warn('School info cloud check skipped:', e);
     }
 
-    // 3. Ensure kelas collection exists in cloud
-    const kelasSnap = await getDocs(collection(db, 'kelas'));
-    if (kelasSnap.empty) {
-      const currentKelas = loadKelasList();
-      if (currentKelas.length > 0) {
-        await saveKelasCloud(currentKelas);
-      }
-    }
-
-    // 4. Ensure gurus collection exists in cloud
-    const gurusSnap = await getDocs(collection(db, 'gurus'));
-    if (gurusSnap.empty) {
-      const currentGurus = loadGuruList();
-      if (currentGurus.length > 0) {
-        await saveGurusCloud(currentGurus);
-      }
-    }
-
-    // 5. Ensure siswa collection exists in cloud
-    const siswaSnap = await getDocs(collection(db, 'siswa'));
-    if (siswaSnap.empty) {
-      const currentSiswa = loadSiswaList();
-      if (currentSiswa.length > 0) {
-        await saveSiswaCloud(currentSiswa);
-      }
-    }
-
+    localStorage.setItem(initKey, 'true');
     markAppInitialized();
     return true;
   } catch (err: any) {
-    console.error('Failed to initialize cloud database:', err);
+    console.warn('Cloud database init status (local storage active):', err);
+    markAppInitialized();
     return false;
   }
 }
@@ -112,8 +88,9 @@ export async function initializeCloudDatabase(): Promise<boolean> {
 function cleanDocForFirestore<T extends Record<string, any>>(obj: T): T {
   const result: any = {};
   Object.keys(obj).forEach((key) => {
-    if (obj[key] !== undefined) {
-      result[key] = obj[key];
+    const val = obj[key];
+    if (val !== undefined && !(typeof val === 'number' && Number.isNaN(val))) {
+      result[key] = val;
     }
   });
   return result;
@@ -192,21 +169,19 @@ export function subscribeToRealtimeCloudData(
     );
     unsubscribers.push(unsubSchool);
 
-    // 2. Gurus Listener (Syncs additions, edits, and permanent deletions)
+    // 2. Gurus Listener (Syncs additions, edits, and deletions without write loops)
     const unsubGurus = onSnapshot(
       collection(db, 'gurus'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        if (snapshot.empty) {
-          const local = loadGuruList();
-          if (local.length > 0) saveGurusCloud(local);
-          return;
-        }
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
         const list = snapshot.docs.map((d) => d.data() as Guru);
         saveGuruList(list);
         onDataLoaded({ gurus: list });
       },
-      onError
+      (err) => {
+        console.warn('Realtime gurus sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubGurus);
 
@@ -214,17 +189,15 @@ export function subscribeToRealtimeCloudData(
     const unsubKelas = onSnapshot(
       collection(db, 'kelas'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        if (snapshot.empty) {
-          const local = loadKelasList();
-          if (local.length > 0) saveKelasCloud(local);
-          return;
-        }
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
         const list = snapshot.docs.map((d) => d.data() as Kelas);
         saveKelasList(list);
         onDataLoaded({ kelas: list });
       },
-      onError
+      (err) => {
+        console.warn('Realtime kelas sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubKelas);
 
@@ -232,36 +205,32 @@ export function subscribeToRealtimeCloudData(
     const unsubMapel = onSnapshot(
       collection(db, 'mapel'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        if (snapshot.empty) {
-          const local = loadMapelList();
-          if (local.length > 0) saveMapelCloud(local);
-          return;
-        }
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
         const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
         list.sort((a, b) => a.urutan - b.urutan);
         saveMapelList(list);
         onDataLoaded({ mapel: list });
       },
-      onError
+      (err) => {
+        console.warn('Realtime mapel sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubMapel);
 
-    // 5. Siswa Listener (Syncs additions, edits, and permanent deletions)
+    // 5. Siswa Listener (Syncs additions, edits, and deletions)
     const unsubSiswa = onSnapshot(
       collection(db, 'siswa'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        if (snapshot.empty) {
-          const local = loadSiswaList();
-          if (local.length > 0) saveSiswaCloud(local);
-          return;
-        }
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
         const list = snapshot.docs.map((d) => d.data() as Siswa);
         saveSiswaList(list);
         onDataLoaded({ siswa: list });
       },
-      onError
+      (err) => {
+        console.warn('Realtime siswa sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubSiswa);
 
@@ -269,38 +238,106 @@ export function subscribeToRealtimeCloudData(
     const unsubConfigs = onSnapshot(
       collection(db, 'subjectConfigs'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        const list = snapshot.docs.map((d) => d.data() as SubjectConfig);
-        saveSubjectConfigs(list);
-        onDataLoaded({ configs: list });
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
+        const cloudConfigs = snapshot.docs.map((d) => d.data() as SubjectConfig);
+        const localConfigs = loadSubjectConfigs();
+        const confMap = new Map<string, SubjectConfig>();
+        localConfigs.forEach((c) => confMap.set(`${c.kelasId}_${c.mapelId}`, c));
+        cloudConfigs.forEach((c) => confMap.set(`${c.kelasId}_${c.mapelId}`, c));
+        const mergedConfigs = Array.from(confMap.values());
+        saveSubjectConfigs(mergedConfigs);
+        onDataLoaded({ configs: mergedConfigs });
       },
-      onError
+      (err) => {
+        console.warn('Realtime configs sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubConfigs);
 
-    // 7. Scores Listener
+    // 7. Scores Listener (Reads both 1-write class documents and legacy single records, merges cleanly)
     const unsubScores = onSnapshot(
       collection(db, 'scores'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        const list = snapshot.docs.map((d) => d.data() as NilaiRecord);
-        saveScores(list);
-        onDataLoaded({ scores: list });
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
+
+        const incomingScores: NilaiRecord[] = [];
+        const incomingConfigs: SubjectConfig[] = [];
+
+        snapshot.docs.forEach((d) => {
+          const data = d.data();
+          if (Array.isArray(data.scores)) {
+            // New format: 1 write per class-mapel containing all student scores
+            incomingScores.push(...data.scores);
+            if (data.config) {
+              incomingConfigs.push(data.config as SubjectConfig);
+            }
+          } else if (data.siswaId && data.mapelId) {
+            // Legacy single record format
+            incomingScores.push({ id: d.id, ...data } as NilaiRecord);
+          }
+        });
+
+        // Merge incoming scores with local scores
+        const localScores = loadScores();
+        const scoreMap = new Map<string, NilaiRecord>();
+        localScores.forEach((sc) => {
+          scoreMap.set(`${sc.siswaId}_${sc.mapelId}`, sc);
+        });
+        incomingScores.forEach((sc) => {
+          scoreMap.set(`${sc.siswaId}_${sc.mapelId}`, sc);
+        });
+        const mergedScores = Array.from(scoreMap.values());
+        saveScores(mergedScores);
+
+        // Also merge any bundled subject configs
+        if (incomingConfigs.length > 0) {
+          const localConfigs = loadSubjectConfigs();
+          const confMap = new Map<string, SubjectConfig>();
+          localConfigs.forEach((c) => confMap.set(`${c.kelasId}_${c.mapelId}`, c));
+          incomingConfigs.forEach((c) => confMap.set(`${c.kelasId}_${c.mapelId}`, c));
+          const mergedConfigs = Array.from(confMap.values());
+          saveSubjectConfigs(mergedConfigs);
+          onDataLoaded({ scores: mergedScores, configs: mergedConfigs });
+        } else {
+          onDataLoaded({ scores: mergedScores });
+        }
       },
-      onError
+      (err) => {
+        console.warn('Realtime scores sync warning (using local scores):', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubScores);
 
-    // 8. Presensi Listener
+    // 8. Presensi Listener (Reads both 1-write class documents and legacy single records)
     const unsubPresensi = onSnapshot(
       collection(db, 'presensi'),
       (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        const list = snapshot.docs.map((d) => d.data() as PresensiCatatan);
-        savePresensi(list);
-        onDataLoaded({ presensi: list });
+        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
+
+        const incomingPresensi: PresensiCatatan[] = [];
+        snapshot.docs.forEach((d) => {
+          const data = d.data();
+          if (Array.isArray(data.records)) {
+            incomingPresensi.push(...data.records);
+          } else if (data.siswaId && data.kelasId) {
+            incomingPresensi.push(data as PresensiCatatan);
+          }
+        });
+
+        const localPresensi = loadPresensi();
+        const presensiMap = new Map<string, PresensiCatatan>();
+        localPresensi.forEach((p) => presensiMap.set(`${p.kelasId}_${p.siswaId}`, p));
+        incomingPresensi.forEach((p) => presensiMap.set(`${p.kelasId}_${p.siswaId}`, p));
+        const mergedPresensi = Array.from(presensiMap.values());
+        savePresensi(mergedPresensi);
+        onDataLoaded({ presensi: mergedPresensi });
       },
-      onError
+      (err) => {
+        console.warn('Realtime presensi sync warning:', err);
+        if (onError) onError(err);
+      }
     );
     unsubscribers.push(unsubPresensi);
   } catch (err: any) {
@@ -480,15 +517,13 @@ export async function saveClassMapelScoresCloud(
   config: SubjectConfig,
   allUpdatedScores: NilaiRecord[],
   allUpdatedConfigs: SubjectConfig[]
-): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+): Promise<{ success: boolean; localOnly?: boolean; syncedCount: number; error?: string }> {
   // 1. Immediately persist full datasets locally
   saveScores(allUpdatedScores);
   saveSubjectConfigs(allUpdatedConfigs);
 
   try {
-    const batch = writeBatch(db);
-
-    // Save config for this class and mapel ONLY
+    // EXACTLY 1 WRITE: Entire class student scores & subject config bundled into 1 document
     const cleanConfig = cleanDocForFirestore({
       ...config,
       kelasId,
@@ -496,35 +531,38 @@ export async function saveClassMapelScoresCloud(
       deskripsiPerAgama: config.deskripsiPerAgama || {},
       updatedAt: Date.now(),
     });
-    batch.set(doc(db, 'subjectConfigs', `${kelasId}_${mapelId}`), cleanConfig);
 
-    // Save individual student scores for this class and mapel ONLY
-    // Does NOT touch scores of other classes or other subjects!
-    updatedClassScores.forEach((sc) => {
-      const id = sc.id || `nr-${sc.siswaId}-${mapelId}`;
-      batch.set(doc(db, 'scores', id), cleanDocForFirestore({
-        ...sc,
-        kelasId,
-        mapelId,
-        updatedAt: Date.now(),
-      }));
+    const classScoreDoc = cleanDocForFirestore({
+      id: `${kelasId}_${mapelId}`,
+      kelasId,
+      mapelId,
+      config: cleanConfig,
+      scores: updatedClassScores,
+      updatedAt: Date.now(),
     });
 
-    // Fire-and-forget background commit to Cloud Firestore
-    // This allows the browser UI to return instantly without waiting for network roundtrips!
-    batch.commit().catch((err) => {
-      console.warn('Background Firestore write error (queued for retry):', err);
-    });
+    // 1 single write to Firestore:
+    await setDoc(doc(db, 'scores', `${kelasId}_${mapelId}`), classScoreDoc);
 
     return { success: true, syncedCount: updatedClassScores.length };
-  } catch (err: any) {
-    console.error('Error saving class mapel scores to cloud:', err);
-    return { success: false, syncedCount: updatedClassScores.length, error: err?.message || 'Gagal tersambung ke Cloud' };
+  } catch (commitErr: any) {
+    console.warn('Firestore commit notice (local-first active):', commitErr);
+    const isQuota =
+      commitErr?.message?.includes('RESOURCE_EXHAUSTED') ||
+      commitErr?.code === 'resource-exhausted';
+    return {
+      success: true,
+      localOnly: true,
+      syncedCount: updatedClassScores.length,
+      error: isQuota
+        ? 'Batas kuota harian Firebase Firestore tercapai. Nilai Anda berhasil tersimpan aman di database lokal perangkat ini (mode hemat kuota aktif)!'
+        : `Nilai tersimpan di perangkat lokal. Catatan Cloud: ${commitErr?.message || 'Kendala jaringan'}`,
+    };
   }
 }
 
 /**
- * Saves presensi for ONE specific class in a targeted batch so other classes are not overwritten in Cloud.
+ * Saves presensi for ONE specific class in 1 single document write to conserve write quota.
  */
 export async function saveClassPresensiCloud(
   kelasId: string,
@@ -533,17 +571,16 @@ export async function saveClassPresensiCloud(
 ) {
   savePresensi(allPresensi);
   try {
-    const batch = writeBatch(db);
-    classPresensi.forEach((p) => {
-      batch.set(doc(db, 'presensi', `${kelasId}_${p.siswaId}`), cleanDocForFirestore({
-        ...p,
-        kelasId,
-        updatedAt: Date.now(),
-      }));
+    // EXACTLY 1 WRITE for the entire class presensi:
+    const classPresensiDoc = cleanDocForFirestore({
+      id: `class_${kelasId}`,
+      kelasId,
+      records: classPresensi,
+      updatedAt: Date.now(),
     });
-    await batch.commit();
+    await setDoc(doc(db, 'presensi', `class_${kelasId}`), classPresensiDoc);
   } catch (e) {
-    console.error('Error saving class presensi to cloud:', e);
+    console.warn('Error saving class presensi to cloud (preserved locally):', e);
   }
 }
 

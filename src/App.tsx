@@ -259,29 +259,26 @@ export default function App() {
     }
   };
 
-  // Handlers for Mapel (Targeted writes + Full Cloud List Synchronization)
+  // Handlers for Mapel (1 Write per operation: instantly synced to all devices)
   const handleAddMapel = async (newM: MataPelajaran) => {
     const updated = [...mapelList, newM];
     setMapelList(updated);
     saveMapelList(updated);
-    await saveSingleMapelCloud(newM);
-    saveMapelCloud(updated);
+    await saveSingleMapelCloud(newM); // EXACTLY 1 WRITE
   };
 
   const handleUpdateMapel = async (updatedM: MataPelajaran) => {
     const updated = mapelList.map((m) => (m.id === updatedM.id ? updatedM : m));
     setMapelList(updated);
     saveMapelList(updated);
-    await saveSingleMapelCloud(updatedM);
-    saveMapelCloud(updated);
+    await saveSingleMapelCloud(updatedM); // EXACTLY 1 WRITE
   };
 
   const handleDeleteMapel = async (id: string) => {
     const updated = mapelList.filter((m) => m.id !== id);
     setMapelList(updated);
     saveMapelList(updated);
-    await deleteMapelCloud(id);
-    saveMapelCloud(updated);
+    await deleteMapelCloud(id); // EXACTLY 1 WRITE
   };
 
   const handleSyncMapelCloud = async () => {
@@ -382,18 +379,20 @@ export default function App() {
     mapelId: string,
     updatedClassScores: NilaiRecord[],
     config: SubjectConfig
-  ): Promise<{ success: boolean; syncedCount: number; error?: string }> => {
+  ): Promise<{ success: boolean; localOnly?: boolean; syncedCount: number; error?: string }> => {
     const otherScores = scoresList.filter(
       (r) => !(r.kelasId === kelasId && r.mapelId === mapelId)
     );
     const allUpdatedScores = [...otherScores, ...updatedClassScores];
     setScoresList(allUpdatedScores);
+    saveScores(allUpdatedScores);
 
     const otherConfigs = subjectConfigs.filter(
       (c) => !(c.kelasId === kelasId && c.mapelId === mapelId)
     );
     const allUpdatedConfigs = [...otherConfigs, config];
     setSubjectConfigs(allUpdatedConfigs);
+    saveSubjectConfigs(allUpdatedConfigs);
 
     return await saveClassMapelScoresCloud(
       kelasId,
