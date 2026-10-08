@@ -8,7 +8,6 @@ import {
   Search,
   FileSpreadsheet,
   Check,
-  FileDown,
   Upload,
   CheckSquare,
   Square,
@@ -202,33 +201,53 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     setIsAdding(false);
   };
 
-  // Unduh format template input siswa sesuai permintaan user
+  // Ekspor data peserta didik ke format Excel yang 100% cocok dengan template impor siswa
   // Kolom: No, NISN, NIS, Nama, Jenis Kelamin, Agama, kelas
-  const handleDownloadFormatTemplate = () => {
-    const targetKelasNama = currentKelas?.nama || 'VII-A';
-    const templateData: (string | number)[][] = [
+  const handleExportSiswaExcel = () => {
+    const exportList = filteredSiswa;
+    if (exportList.length === 0) {
+      alert('Tidak ada data peserta didik untuk diekspor.');
+      return;
+    }
+
+    const targetKelasNama =
+      kelasFilter !== 'ALL' && kelasFilter !== 'UNASSIGNED' && currentKelas
+        ? currentKelas.nama
+        : 'Semua_Kelas';
+
+    const exportData: (string | number)[][] = [
       ['No', 'NISN', 'NIS', 'Nama', 'Jenis Kelamin', 'Agama', 'kelas'],
-      [1, '0098451201', '240701', 'Ahmad Fadillah Pratama', 'L', 'Islam', targetKelasNama],
-      [2, '0098451202', '240702', 'Aulia Rahmawati Dewi', 'P', 'Islam', targetKelasNama],
-      [3, '0098451203', '240703', 'Chelsea Aurelia Putri', 'P', 'Kristen', targetKelasNama],
-      [4, '0098451204', '240704', 'Gisella Natasha', 'P', 'Katolik', targetKelasNama],
-      [5, '0098451205', '240705', 'Larasati Dewi', 'P', 'Hindu', targetKelasNama],
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    exportList.forEach((s, idx) => {
+      const k = kelasList.find((item) => item.id === s.kelasId);
+      const kelasNama = k ? k.nama : 'Belum Ditentukan';
+      exportData.push([
+        idx + 1,
+        s.nisn || '',
+        s.nis || '',
+        s.nama || '',
+        s.jenisKelamin || 'L',
+        s.agama || 'Islam',
+        kelasNama,
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(exportData);
     ws['!cols'] = [
       { wch: 6 },  // No
       { wch: 16 }, // NISN
       { wch: 12 }, // NIS
-      { wch: 32 }, // Nama
+      { wch: 34 }, // Nama
       { wch: 14 }, // Jenis Kelamin
       { wch: 14 }, // Agama
       { wch: 12 }, // kelas
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Format_Input_Siswa');
-    XLSX.writeFile(wb, `Format_Input_Siswa_Kelas_${targetKelasNama}.xlsx`);
+    const sheetName = targetKelasNama === 'Semua_Kelas' ? 'Data_Siswa' : `Siswa_${targetKelasNama}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `Data_Siswa_${targetKelasNama}.xlsx`);
   };
 
   // Impor file Excel berdasarkan format template dengan auto-detect & auto-create rombel kelas baru
@@ -450,14 +469,14 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               </select>
             </div>
 
-            {/* Unduh Format Input Siswa */}
+            {/* Ekspor Data Siswa Excel (Format sama dengan template impor) */}
             <button
-              onClick={handleDownloadFormatTemplate}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl transition shadow-xs"
-              title="Unduh Format Excel Input Siswa (No, NISN, NIS, Nama, Jenis Kelamin, kelas)"
+              onClick={handleExportSiswaExcel}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+              title="Ekspor Data Peserta Didik ke Excel (format sama dengan template impor)"
             >
-              <FileDown className="w-4 h-4 text-amber-600" />
-              <span>Unduh Format Siswa</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Ekspor Data Siswa</span>
             </button>
 
             {/* Impor Format Excel */}
