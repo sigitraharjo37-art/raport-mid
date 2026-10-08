@@ -40,7 +40,9 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
   presensiList,
 }) => {
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
-  const currentSiswaList = siswaList.filter((s) => s.kelasId === selectedKelasId);
+  const currentSiswaList = siswaList
+    .filter((s) => s.kelasId === selectedKelasId)
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
   const sortedMapel = [...mapelList].sort((a, b) => a.urutan - b.urutan);
 
   const [selectedSiswaId, setSelectedSiswaId] = useState<string>(currentSiswaList[0]?.id || '');

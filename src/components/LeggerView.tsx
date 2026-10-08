@@ -37,7 +37,7 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
   subjectConfigs,
   scoresList,
 }) => {
-  const [sortBy, setSortBy] = useState<'ranking' | 'nis' | 'nama'>('ranking');
+  const [sortBy, setSortBy] = useState<'ranking' | 'nis' | 'nama'>('nama');
   const [searchQuery, setSearchQuery] = useState('');
   const [showPrintPreview, setShowPrintPreview] = useState(false);
 
@@ -53,14 +53,14 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
     scoresList
   );
 
-  // Apply sorting
+  // Apply sorting (Urut sesuai abjad A-Z nama peserta didik secara default)
   const sortedRows = [...rawLegerRows].sort((a, b) => {
     if (sortBy === 'ranking') {
       return a.ranking - b.ranking;
     } else if (sortBy === 'nis') {
       return a.siswa.nis.localeCompare(b.siswa.nis);
     } else {
-      return a.siswa.nama.localeCompare(b.siswa.nama);
+      return a.siswa.nama.localeCompare(b.siswa.nama, 'id', { sensitivity: 'base' });
     }
   });
 

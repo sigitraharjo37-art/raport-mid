@@ -24,7 +24,9 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
-  const currentSiswa = siswaList.filter((s) => s.kelasId === selectedKelasId);
+  const currentSiswa = siswaList
+    .filter((s) => s.kelasId === selectedKelasId)
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
 
   useEffect(() => {
     const temp: Record<string, { sakit: number; izin: number; alpa: number; catatan: string }> = {};

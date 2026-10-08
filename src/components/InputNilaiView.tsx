@@ -96,7 +96,9 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
   const currentMapel = mapelList.find((m) => m.id === selectedMapelId) || mapelList[0];
-  const currentSiswa = siswaList.filter((s) => s.kelasId === selectedKelasId);
+  const currentSiswa = siswaList
+    .filter((s) => s.kelasId === selectedKelasId)
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
 
   // Deteksi apakah mapel yang dipilih adalah mata pelajaran Agama (PAI, PAIBP, Pendidikan Agama, dll.)
   const isMapelAgama = Boolean(

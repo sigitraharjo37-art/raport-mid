@@ -166,7 +166,9 @@ export function calculateLegger(
   subjectConfigs: SubjectConfig[],
   scoresList: NilaiRecord[]
 ): LegerRow[] {
-  const kelasSiswa = siswaList.filter((s) => s.kelasId === kelasId);
+  const kelasSiswa = siswaList
+    .filter((s) => s.kelasId === kelasId)
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
   const rows: Omit<LegerRow, 'ranking'>[] = [];
 
   kelasSiswa.forEach((siswa) => {

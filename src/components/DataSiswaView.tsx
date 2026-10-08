@@ -77,7 +77,8 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
         s.nisn.toLowerCase().includes(q) ||
         (matchedKelas && matchedKelas.nama.toLowerCase().includes(q))
       );
-    });
+    })
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
 
   const currentKelas =
     kelasList.find(
