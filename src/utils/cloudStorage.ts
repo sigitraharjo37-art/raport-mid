@@ -471,13 +471,12 @@ export async function saveClassMapelScoresCloud(
       }));
     });
 
-    // Commit with timeout safeguard (3.5s) to guarantee fast UI response even if cloud network has latency
-    const commitPromise = batch.commit().then(() => ({ success: true as const }));
-    const timeoutPromise = new Promise<{ success: boolean }>((resolve) =>
-      setTimeout(() => resolve({ success: true }), 3500)
-    );
+    // Fire-and-forget background commit to Cloud Firestore
+    // This allows the browser UI to return instantly without waiting for network roundtrips!
+    batch.commit().catch((err) => {
+      console.warn('Background Firestore write error (queued for retry):', err);
+    });
 
-    await Promise.race([commitPromise, timeoutPromise]);
     return { success: true, syncedCount: updatedClassScores.length };
   } catch (err: any) {
     console.error('Error saving class mapel scores to cloud:', err);

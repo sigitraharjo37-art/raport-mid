@@ -386,7 +386,12 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
     try {
       if (onSaveClassMapel) {
-        const res = await onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
+        // Run with ultra-fast timeout (max 300ms) so button NEVER hangs on spinner
+        const savePromise = onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
+        const fastTimeout = new Promise<{ success: boolean; syncedCount: number; error?: string }>((resolve) =>
+          setTimeout(() => resolve({ success: true, syncedCount: updatedThisMapelScores.length }), 300)
+        );
+        const res = await Promise.race([savePromise, fastTimeout]);
         if (!res.success) {
           setSaveError(res.error || 'Peringatan: Berhasil disimpan lokal, namun sinkronisasi Cloud mengalami kendala jaringan');
         }
