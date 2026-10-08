@@ -8,7 +8,7 @@ interface PresensiViewProps {
   onSelectKelas: (kelasId: string) => void;
   siswaList: Siswa[];
   presensiList: PresensiCatatan[];
-  onSavePresensi: (data: PresensiCatatan[]) => void;
+  onSavePresensi: (data: PresensiCatatan[], kelasId?: string) => void;
 }
 
 export const PresensiView: React.FC<PresensiViewProps> = ({
@@ -21,6 +21,7 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
 }) => {
   const [localPresensi, setLocalPresensi] = useState<Record<string, { sakit: number; izin: number; alpa: number; catatan: string }>>({});
   const [isSavedToast, setIsSavedToast] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
   const currentSiswa = siswaList.filter((s) => s.kelasId === selectedKelasId);
@@ -28,7 +29,7 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
   useEffect(() => {
     const temp: Record<string, { sakit: number; izin: number; alpa: number; catatan: string }> = {};
     currentSiswa.forEach((s) => {
-      const rec = presensiList.find((p) => p.siswaId === s.id);
+      const rec = presensiList.find((p) => p.siswaId === s.id && p.kelasId === selectedKelasId);
       if (rec) {
         temp[s.id] = {
           sakit: rec.sakit,
@@ -46,9 +47,11 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
       }
     });
     setLocalPresensi(temp);
-  }, [selectedKelasId, presensiList, siswaList]);
+    setHasUnsavedChanges(false);
+  }, [selectedKelasId]);
 
   const handleChange = (siswaId: string, field: 'sakit' | 'izin' | 'alpa', val: number) => {
+    setHasUnsavedChanges(true);
     setLocalPresensi((prev) => ({
       ...prev,
       [siswaId]: {
@@ -59,6 +62,7 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
   };
 
   const handleCatatanChange = (siswaId: string, val: string) => {
+    setHasUnsavedChanges(true);
     setLocalPresensi((prev) => ({
       ...prev,
       [siswaId]: {
@@ -69,6 +73,7 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
   };
 
   const handleAutoFillCatatan = () => {
+    setHasUnsavedChanges(true);
     const positiveTemplates = [
       'Pertahankan motivasi belajar, kedisiplinan, dan terus tingkatkan prestasimu.',
       'Sangat rajin dan berakhlak mulia. Teruslah menjadi teladan yang baik bagi teman-teman.',
@@ -106,7 +111,8 @@ export const PresensiView: React.FC<PresensiViewProps> = ({
       };
     });
 
-    onSavePresensi([...otherPresensi, ...updatedPresensi]);
+    onSavePresensi([...otherPresensi, ...updatedPresensi], selectedKelasId);
+    setHasUnsavedChanges(false);
     setIsSavedToast(true);
     setTimeout(() => setIsSavedToast(false), 2000);
   };

@@ -276,16 +276,32 @@ export async function saveSchoolInfoCloud(info: SchoolInfo) {
   }
 }
 
+export async function saveSingleGuruCloud(guru: Guru) {
+  try {
+    await setDoc(doc(db, 'gurus', guru.id), cleanDocForFirestore(guru));
+  } catch (e) {
+    console.error('Error saving single guru to cloud:', e);
+  }
+}
+
 export async function saveGurusCloud(gurus: Guru[]) {
   saveGuruList(gurus);
   try {
     const batch = writeBatch(db);
     gurus.forEach((g) => {
-      batch.set(doc(db, 'gurus', g.id), g);
+      batch.set(doc(db, 'gurus', g.id), cleanDocForFirestore(g));
     });
     await batch.commit();
   } catch (e) {
     console.error('Error saving gurus to cloud:', e);
+  }
+}
+
+export async function saveSingleKelasCloud(kelas: Kelas) {
+  try {
+    await setDoc(doc(db, 'kelas', kelas.id), cleanDocForFirestore(kelas));
+  } catch (e) {
+    console.error('Error saving single kelas to cloud:', e);
   }
 }
 
@@ -294,11 +310,19 @@ export async function saveKelasCloud(kelas: Kelas[]) {
   try {
     const batch = writeBatch(db);
     kelas.forEach((k) => {
-      batch.set(doc(db, 'kelas', k.id), k);
+      batch.set(doc(db, 'kelas', k.id), cleanDocForFirestore(k));
     });
     await batch.commit();
   } catch (e) {
     console.error('Error saving kelas to cloud:', e);
+  }
+}
+
+export async function saveSingleMapelCloud(mapel: MataPelajaran) {
+  try {
+    await setDoc(doc(db, 'mapel', mapel.id), cleanDocForFirestore(mapel));
+  } catch (e) {
+    console.error('Error saving single mapel to cloud:', e);
   }
 }
 
@@ -307,11 +331,23 @@ export async function saveMapelCloud(mapel: MataPelajaran[]) {
   try {
     const batch = writeBatch(db);
     mapel.forEach((m) => {
-      batch.set(doc(db, 'mapel', m.id), m);
+      batch.set(doc(db, 'mapel', m.id), cleanDocForFirestore(m));
     });
     await batch.commit();
   } catch (e) {
     console.error('Error saving mapel to cloud:', e);
+  }
+}
+
+export async function saveSingleSiswaCloud(siswa: Siswa) {
+  try {
+    const cleaned = cleanDocForFirestore({
+      ...siswa,
+      agama: siswa.agama || 'Islam',
+    });
+    await setDoc(doc(db, 'siswa', siswa.id), cleaned);
+  } catch (e) {
+    console.error('Error saving single siswa to cloud:', e);
   }
 }
 
@@ -336,6 +372,19 @@ export async function saveSiswaCloud(siswa: Siswa[]) {
   }
 }
 
+export async function saveSingleSubjectConfigCloud(config: SubjectConfig) {
+  try {
+    const cleaned = cleanDocForFirestore({
+      ...config,
+      deskripsiPerAgama: config.deskripsiPerAgama || {},
+      updatedAt: Date.now(),
+    });
+    await setDoc(doc(db, 'subjectConfigs', `${config.kelasId}_${config.mapelId}`), cleaned);
+  } catch (e) {
+    console.error('Error saving single subject config to cloud:', e);
+  }
+}
+
 export async function saveSubjectConfigsCloud(configs: SubjectConfig[]) {
   saveSubjectConfigs(configs);
   try {
@@ -344,6 +393,7 @@ export async function saveSubjectConfigsCloud(configs: SubjectConfig[]) {
       const cleaned = cleanDocForFirestore({
         ...c,
         deskripsiPerAgama: c.deskripsiPerAgama || {},
+        updatedAt: Date.now(),
       });
       batch.set(doc(db, 'subjectConfigs', `${c.kelasId}_${c.mapelId}`), cleaned);
     });
@@ -362,7 +412,7 @@ export async function saveScoresCloud(scores: NilaiRecord[]) {
       const batch = writeBatch(db);
       chunk.forEach((sc) => {
         const id = sc.id || `nr-${sc.siswaId}-${sc.mapelId}`;
-        batch.set(doc(db, 'scores', id), sc);
+        batch.set(doc(db, 'scores', id), cleanDocForFirestore(sc));
       });
       await batch.commit();
     }
@@ -371,12 +421,89 @@ export async function saveScoresCloud(scores: NilaiRecord[]) {
   }
 }
 
+/**
+ * Saves and synchronizes scores and subject config for a specific class and subject in a single atomic batch.
+ * This is called by "Simpan Semua Nilai" to ensure targeted, high-speed, and reliable synchronization.
+ * Does NOT overwrite other classes or other subjects in the cloud database!
+ */
+export async function saveClassMapelScoresCloud(
+  kelasId: string,
+  mapelId: string,
+  updatedClassScores: NilaiRecord[],
+  config: SubjectConfig,
+  allUpdatedScores: NilaiRecord[],
+  allUpdatedConfigs: SubjectConfig[]
+): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+  // 1. Immediately persist full datasets locally
+  saveScores(allUpdatedScores);
+  saveSubjectConfigs(allUpdatedConfigs);
+
+  try {
+    const batch = writeBatch(db);
+
+    // Save config for this class and mapel ONLY
+    const cleanConfig = cleanDocForFirestore({
+      ...config,
+      kelasId,
+      mapelId,
+      deskripsiPerAgama: config.deskripsiPerAgama || {},
+      updatedAt: Date.now(),
+    });
+    batch.set(doc(db, 'subjectConfigs', `${kelasId}_${mapelId}`), cleanConfig);
+
+    // Save individual student scores for this class and mapel ONLY
+    // Does NOT touch scores of other classes or other subjects!
+    updatedClassScores.forEach((sc) => {
+      const id = sc.id || `nr-${sc.siswaId}-${mapelId}`;
+      batch.set(doc(db, 'scores', id), cleanDocForFirestore({
+        ...sc,
+        kelasId,
+        mapelId,
+        updatedAt: Date.now(),
+      }));
+    });
+
+    await batch.commit();
+    return { success: true, syncedCount: updatedClassScores.length };
+  } catch (err: any) {
+    console.error('Error saving class mapel scores to cloud:', err);
+    return { success: false, syncedCount: updatedClassScores.length, error: err?.message || 'Gagal tersambung ke Cloud' };
+  }
+}
+
+/**
+ * Saves presensi for ONE specific class in a targeted batch so other classes are not overwritten in Cloud.
+ */
+export async function saveClassPresensiCloud(
+  kelasId: string,
+  classPresensi: PresensiCatatan[],
+  allPresensi: PresensiCatatan[]
+) {
+  savePresensi(allPresensi);
+  try {
+    const batch = writeBatch(db);
+    classPresensi.forEach((p) => {
+      batch.set(doc(db, 'presensi', `${kelasId}_${p.siswaId}`), cleanDocForFirestore({
+        ...p,
+        kelasId,
+        updatedAt: Date.now(),
+      }));
+    });
+    await batch.commit();
+  } catch (e) {
+    console.error('Error saving class presensi to cloud:', e);
+  }
+}
+
 export async function savePresensiCloud(presensi: PresensiCatatan[]) {
   savePresensi(presensi);
   try {
     const batch = writeBatch(db);
     presensi.forEach((p) => {
-      batch.set(doc(db, 'presensi', `${p.kelasId}_${p.siswaId}`), p);
+      batch.set(doc(db, 'presensi', `${p.kelasId}_${p.siswaId}`), cleanDocForFirestore({
+        ...p,
+        updatedAt: Date.now(),
+      }));
     });
     await batch.commit();
   } catch (e) {

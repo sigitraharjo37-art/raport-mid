@@ -84,8 +84,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
 
-    // 4. Jika memasukkan nomor HP apapun dengan password '123123'
-    if (inputPass === '123123' && (normInput.startsWith('08') || /^\d{8,14}$/.test(normInput))) {
+    // 4. Cek Login Guru via Nama Guru atau NIP terdaftar
+    const matchedByNameOrNip = guruList.find(
+      (g) =>
+        g.nama.toLowerCase().trim() === inputUser.toLowerCase().trim() ||
+        (g.nip && g.nip.trim() === inputUser)
+    );
+    if (matchedByNameOrNip && (inputPass === 'Guru123' || inputPass === '123123')) {
+      onLogin({
+        role: 'guru',
+        username: matchedByNameOrNip.nama,
+        nama: matchedByNameOrNip.nama,
+        guruId: matchedByNameOrNip.id,
+        noHp: matchedByNameOrNip.noHp,
+      });
+      return;
+    }
+
+    // 5. Jika memasukkan nomor HP apapun dengan password '123123' atau 'Guru123'
+    if ((inputPass === '123123' || inputPass === 'Guru123') && (normInput.startsWith('08') || /^\d{8,14}$/.test(normInput))) {
       onLogin({
         role: 'guru',
         username: inputUser,

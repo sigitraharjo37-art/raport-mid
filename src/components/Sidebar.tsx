@@ -42,14 +42,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'mapel', label: 'Mata Pelajaran', icon: BookOpen, category: 'Data Master' },
   ];
 
-  // Group items by category
-  const categories = ['Utama', 'Penilaian', 'Data Master'];
+  // Group items by category - sembunyikan Data Master jika role guru
+  const isGuru = currentUser?.role === 'guru';
+  const categories = isGuru ? ['Utama', 'Penilaian'] : ['Utama', 'Penilaian', 'Data Master'];
+  const filteredMenuItems = isGuru
+    ? menuItems.filter((m) => m.category !== 'Data Master')
+    : menuItems;
 
   return (
     <aside className="w-full md:w-64 bg-white border-r border-slate-200 shrink-0 no-print flex flex-col justify-between">
       <div className="p-4 space-y-6 flex-1">
         {categories.map((cat) => {
-          const items = menuItems.filter((m) => m.category === cat);
+          const items = filteredMenuItems.filter((m) => m.category === cat);
           return (
             <div key={cat}>
               <h4 className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">

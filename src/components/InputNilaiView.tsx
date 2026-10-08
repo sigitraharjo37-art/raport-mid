@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, SchoolInfo, Guru, DAFTAR_AGAMA } from '../types/rapor';
 import { exportNilaiMapelToExcel } from '../utils/excelExport';
 import {
@@ -15,6 +15,12 @@ import {
   FileText,
   BookOpen,
   RotateCcw,
+  Database,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Cloud,
+  CheckCheck,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -37,6 +43,12 @@ interface InputNilaiViewProps {
   scoresList: NilaiRecord[];
   onSaveScores: (records: NilaiRecord[]) => void;
   onSaveConfig: (config: SubjectConfig) => void;
+  onSaveClassMapel?: (
+    kelasId: string,
+    mapelId: string,
+    updatedClassScores: NilaiRecord[],
+    config: SubjectConfig
+  ) => Promise<{ success: boolean; syncedCount: number; error?: string }>;
 }
 
 export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
@@ -49,6 +61,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   scoresList,
   onSaveScores,
   onSaveConfig,
+  onSaveClassMapel,
 }) => {
   const [selectedKelasId, setSelectedKelasId] = useState<string>(kelasList[0]?.id || '');
   const [selectedMapelId, setSelectedMapelId] = useState<string>(mapelList[0]?.id || '');
@@ -64,7 +77,20 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
   // Local state for scores of current class and subject
   const [localScores, setLocalScores] = useState<Record<string, { formatif: number; sumatif: number; akhir: number; capaian: string }>>({});
+  
+  // Model Sinkronisasi State
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSavedToast, setIsSavedToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('Baru saja');
+  const [pendingSwitch, setPendingSwitch] = useState<{ type: 'kelas' | 'mapel'; id: string } | null>(null);
+
+  // Ref to track active class & mapel to prevent background sync from wiping unsaved edits
+  const activeSelectionRef = useRef({ kelasId: selectedKelasId, mapelId: selectedMapelId });
+  const hasUnsavedRef = useRef(hasUnsavedChanges);
+  hasUnsavedRef.current = hasUnsavedChanges;
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
   const currentMapel = mapelList.find((m) => m.id === selectedMapelId) || mapelList[0];
@@ -95,6 +121,20 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   // Load subject config and scores whenever kelas or mapel changes
   useEffect(() => {
     if (!selectedKelasId || !selectedMapelId) return;
+
+    const isDifferentSelection =
+      activeSelectionRef.current.kelasId !== selectedKelasId ||
+      activeSelectionRef.current.mapelId !== selectedMapelId;
+
+    // If active class/mapel is the same AND teacher has unsaved manual changes, don't overwrite local draft!
+    if (!isDifferentSelection && hasUnsavedRef.current) {
+      return;
+    }
+
+    if (isDifferentSelection) {
+      activeSelectionRef.current = { kelasId: selectedKelasId, mapelId: selectedMapelId };
+      setHasUnsavedChanges(false);
+    }
 
     // Load config
     const conf = subjectConfigs.find((c) => c.kelasId === selectedKelasId && c.mapelId === selectedMapelId);
@@ -147,6 +187,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   // Recalculate akhir when formatif or sumatif changes
   const handleScoreChange = (siswaId: string, field: 'formatif' | 'sumatif', val: number) => {
     const clampedVal = Math.max(0, Math.min(100, val || 0));
+    setHasUnsavedChanges(true);
     setLocalScores((prev) => {
       const current = prev[siswaId] || { formatif: 0, sumatif: 0, akhir: 0, capaian: '' };
       const nextFormatif = field === 'formatif' ? clampedVal : current.formatif;
@@ -165,6 +206,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   };
 
   const handleCapaianChange = (siswaId: string, val: string) => {
+    setHasUnsavedChanges(true);
     setLocalScores((prev) => ({
       ...prev,
       [siswaId]: {
@@ -178,6 +220,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const handleGenerateDeskripsiAll = () => {
     if (!currentMapel) return;
     const mapelName = currentMapel.nama;
+    setHasUnsavedChanges(true);
 
     setLocalScores((prev) => {
       const updated = { ...prev };
@@ -215,6 +258,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
   // Reset semua nilai siswa di kelas dan mapel saat ini menjadi 0
   const handleResetAllToZero = () => {
+    setHasUnsavedChanges(true);
     setLocalScores((prev) => {
       const updated = { ...prev };
       currentSiswa.forEach((s) => {
@@ -230,6 +274,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   };
 
   const handleSetAgamaDeskripsi = (agama: string, value: string) => {
+    setHasUnsavedChanges(true);
     setDeskripsiPerAgama((prev) => ({
       ...prev,
       [agama]: value,
@@ -237,6 +282,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   };
 
   const handleFillAllExampleAgama = () => {
+    setHasUnsavedChanges(true);
     setDeskripsiPerAgama(CONTOH_DESKRIPSI_AGAMA);
   };
 
@@ -245,10 +291,57 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       alert('Deskripsi umum belum diisi.');
       return;
     }
+    setHasUnsavedChanges(true);
     handleSetAgamaDeskripsi(agama, deskripsiMapel.trim());
   };
 
-  const handleSaveAll = () => {
+  // Navigasi aman saat ada perubahan belum disimpan
+  const handleSelectKelas = (newId: string) => {
+    if (newId === selectedKelasId) return;
+    if (hasUnsavedChanges) {
+      setPendingSwitch({ type: 'kelas', id: newId });
+    } else {
+      setSelectedKelasId(newId);
+    }
+  };
+
+  const handleSelectMapel = (newId: string) => {
+    if (newId === selectedMapelId) return;
+    if (hasUnsavedChanges) {
+      setPendingSwitch({ type: 'mapel', id: newId });
+    } else {
+      setSelectedMapelId(newId);
+    }
+  };
+
+  const handleConfirmSwitchWithSave = async () => {
+    if (!pendingSwitch) return;
+    await handleSaveAll();
+    if (pendingSwitch.type === 'kelas') {
+      setSelectedKelasId(pendingSwitch.id);
+    } else {
+      setSelectedMapelId(pendingSwitch.id);
+    }
+    setPendingSwitch(null);
+  };
+
+  const handleConfirmSwitchWithoutSave = () => {
+    if (!pendingSwitch) return;
+    setHasUnsavedChanges(false);
+    if (pendingSwitch.type === 'kelas') {
+      setSelectedKelasId(pendingSwitch.id);
+    } else {
+      setSelectedMapelId(pendingSwitch.id);
+    }
+    setPendingSwitch(null);
+  };
+
+  // Simpan Semua Nilai (Model Sinkron Manual ke Database Lokal & Cloud)
+  const handleSaveAll = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError('');
+
     // 1. Save Config
     const newConfig: SubjectConfig = {
       kelasId: selectedKelasId,
@@ -260,13 +353,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       deskripsiMapel: deskripsiMapel.trim(),
       deskripsiPerAgama: deskripsiPerAgama,
     };
-    onSaveConfig(newConfig);
 
     // 2. Prepare scores to save
-    const otherScores = scoresList.filter(
-      (r) => !(r.kelasId === selectedKelasId && r.mapelId === selectedMapelId)
-    );
-
     const updatedThisMapelScores: NilaiRecord[] = currentSiswa.map((s) => {
       const entry = localScores[s.id] || { formatif: 0, sumatif: 0, akhir: 0, capaian: '' };
       return {
@@ -281,10 +369,32 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       };
     });
 
-    onSaveScores([...otherScores, ...updatedThisMapelScores]);
+    try {
+      if (onSaveClassMapel) {
+        const res = await onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
+        if (!res.success) {
+          setSaveError(res.error || 'Peringatan: Berhasil disimpan lokal, namun sinkronisasi Cloud mengalami kendala');
+        }
+      } else {
+        const otherScores = scoresList.filter(
+          (r) => !(r.kelasId === selectedKelasId && r.mapelId === selectedMapelId)
+        );
+        onSaveConfig(newConfig);
+        onSaveScores([...otherScores, ...updatedThisMapelScores]);
+      }
 
-    setIsSavedToast(true);
-    setTimeout(() => setIsSavedToast(false), 2500);
+      setHasUnsavedChanges(false);
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+      setLastSyncedTime(timeStr);
+      setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan disinkronkan ke Cloud.`);
+      setIsSavedToast(true);
+      setTimeout(() => setIsSavedToast(false), 3500);
+    } catch (err: any) {
+      console.error(err);
+      setSaveError('Terjadi kesalahan saat menyimpan data nilai.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -370,7 +480,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           return updated;
         });
 
-        alert('Berhasil mengimpor nilai dari Excel! Klik "Simpan Nilai" untuk menyimpan permanen.');
+        setHasUnsavedChanges(true);
+        alert('Berhasil mengimpor nilai dari Excel! Klik "Simpan Semua Nilai" untuk menyimpan dan menyinkronkan data ke Cloud.');
       } catch (err) {
         alert('Gagal membaca file Excel. Harap periksa format file.');
       }
@@ -389,6 +500,51 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Banner Model Sinkronisasi Input Data Siswa */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 rounded-2xl p-4 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0 mt-0.5 shadow-inner">
+            <Database className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+              <span className="text-xs font-black uppercase tracking-wider text-white">
+                Model Sinkronisasi Data Siswa
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
+                Penyimpanan Manual Terkontrol
+              </span>
+              {hasUnsavedChanges ? (
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-400/40 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span>Ada Nilai Belum Disimpan</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  <CheckCircle className="w-3 h-3 text-emerald-400" />
+                  <span>Tersinkron ke Cloud & Lokal</span>
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+              Nilai yang diinputkan guru disimpan dalam penampung draf lokal dan <strong>disinkronkan secara resmi ke database Cloud (Firestore) serta buku Leger & Rapor</strong> saat menekan tombol <strong>"Simpan Semua Nilai"</strong>.
+            </p>
+          </div>
+        </div>
+
+        {/* Info Terakhir Disimpan & Total Siswa */}
+        <div className="flex items-center space-x-4 border-t md:border-t-0 md:border-l border-slate-800/80 pt-3 md:pt-0 md:pl-5 text-xs text-slate-300 shrink-0">
+          <div>
+            <span className="block text-[10px] text-slate-400 uppercase font-semibold">Terakhir Disimpan:</span>
+            <span className="font-bold text-white font-mono">{lastSyncedTime}</span>
+          </div>
+          <div>
+            <span className="block text-[10px] text-slate-400 uppercase font-semibold">Jumlah Siswa:</span>
+            <span className="font-bold text-emerald-400">{currentSiswa.length} Siswa</span>
+          </div>
+        </div>
+      </div>
+
       {/* Top Filter and Actions */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -406,7 +562,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleGenerateDeskripsiAll}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl transition border border-indigo-200"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl transition border border-indigo-200 cursor-pointer"
               title="Buat deskripsi capaian otomatis untuk semua siswa sesuai KKTP"
             >
               <Sparkles className="w-4 h-4 text-indigo-600" />
@@ -424,7 +580,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
             <button
               onClick={handleExportExcel}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl transition border border-emerald-200"
+              className="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl transition border border-emerald-200 cursor-pointer"
               title="Unduh template / nilai saat ini ke Excel"
             >
               <Download className="w-4 h-4 text-emerald-600" />
@@ -440,26 +596,67 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
               <input type="file" accept=".xlsx, .xls" onChange={handleImportExcel} className="hidden" />
             </label>
 
+            {/* Tombol Simpan Semua Nilai Utama */}
             <button
               onClick={handleSaveAll}
-              className="inline-flex items-center space-x-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 transition"
+              disabled={isSaving}
+              className={`inline-flex items-center space-x-2 px-5 py-2.5 text-xs font-bold rounded-xl shadow-md transition cursor-pointer ${
+                isSaving
+                  ? 'bg-indigo-400 text-white cursor-wait'
+                  : hasUnsavedChanges
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/50 shadow-amber-600/30 animate-pulse'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+              }`}
+              title="Simpan seluruh nilai kelas ini dan sinkronkan ke Cloud & Rapor"
             >
-              <Save className="w-4 h-4" />
-              <span>{isSavedToast ? 'Tersimpan!' : 'Simpan Nilai'}</span>
+              {isSaving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                  <span>Menyinkronkan...</span>
+                </>
+              ) : isSavedToast ? (
+                <>
+                  <CheckCircle className="w-4 h-4 text-emerald-300" />
+                  <span>Tersimpan & Sinkron!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Semua Nilai</span>
+                  {hasUnsavedChanges && (
+                    <span className="w-2 h-2 rounded-full bg-white"></span>
+                  )}
+                </>
+              )}
             </button>
           </div>
         </div>
 
+        {/* Notifikasi Error jika ada kendala simpan */}
+        {saveError && (
+          <div className="bg-amber-50 border border-amber-300 text-amber-800 text-xs p-3 rounded-xl flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
         {/* Kelas & Mapel Selectors */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Pilih Rombel / Kelas:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Pilih Rombel / Kelas:
+              </label>
+              {hasUnsavedChanges && (
+                <span className="text-[10px] text-amber-600 font-semibold">
+                  (Simpan nilai sebelum pindah)
+                </span>
+              )}
+            </div>
             <select
               value={selectedKelasId}
-              onChange={(e) => setSelectedKelasId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => handleSelectKelas(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               {kelasList.map((k) => (
                 <option key={k.id} value={k.id}>
@@ -470,13 +667,20 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           </div>
 
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Pilih Mata Pelajaran:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Pilih Mata Pelajaran:
+              </label>
+              {hasUnsavedChanges && (
+                <span className="text-[10px] text-amber-600 font-semibold">
+                  (Simpan nilai sebelum pindah)
+                </span>
+              )}
+            </div>
             <select
               value={selectedMapelId}
-              onChange={(e) => setSelectedMapelId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => handleSelectMapel(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
               {mapelList.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -838,6 +1042,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                           min={0}
                           max={100}
                           value={entry.formatif}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => handleScoreChange(s.id, 'formatif', Number(e.target.value))}
                           className="w-20 px-2.5 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
                         />
@@ -851,6 +1056,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
                           min={0}
                           max={100}
                           value={entry.sumatif}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => handleScoreChange(s.id, 'sumatif', Number(e.target.value))}
                           className="w-20 px-2.5 py-1.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
                         />
@@ -905,18 +1111,117 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
         {/* Footer save reminder */}
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-xs text-slate-500">
-            Tips: Tekan tombol <strong>"Simpan Nilai"</strong> untuk memperbarui data buku Leger dan Rapor siswa.
-          </p>
+          <div className="space-y-0.5">
+            <p className="text-xs text-slate-700 font-semibold flex items-center space-x-1.5">
+              <Database className="w-4 h-4 text-indigo-600" />
+              <span>Model Sinkronisasi Data Siswa: Manual via Tombol</span>
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {hasUnsavedChanges
+                ? 'Ada nilai yang belum disimpan. Tekan tombol "Simpan Semua Nilai" agar data tersimpan aman ke Cloud & Rapor.'
+                : 'Data nilai seluruh siswa kelas ini aman dan telah tersinkron ke Cloud & database lokal.'}
+            </p>
+          </div>
+
           <button
             onClick={handleSaveAll}
-            className="inline-flex items-center justify-center space-x-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 transition"
+            disabled={isSaving}
+            className={`inline-flex items-center justify-center space-x-2 px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition cursor-pointer ${
+              isSaving
+                ? 'bg-indigo-400 text-white cursor-wait'
+                : hasUnsavedChanges
+                ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/50 shadow-amber-600/30 animate-pulse'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+            }`}
           >
-            <Save className="w-4 h-4" />
-            <span>{isSavedToast ? 'Berhasil Disimpan!' : 'Simpan Semua Nilai'}</span>
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span>Menyimpan & Menyinkronkan...</span>
+              </>
+            ) : isSavedToast ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                <span>Berhasil Disimpan & Tersinkron!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Simpan Semua Nilai</span>
+                {hasUnsavedChanges && (
+                  <span className="ml-1 text-[10px] bg-white text-amber-800 px-1.5 py-0.5 rounded-full font-bold">
+                    Belum Disimpan
+                  </span>
+                )}
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Modal Dialog Konfirmasi Berpindah Rombel / Mapel jika Ada Nilai Belum Disimpan */}
+      {pendingSwitch && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-slate-900 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Simpan Nilai Siswa Sebelum Berpindah?
+              </h3>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                Terdapat nilai siswa pada <strong>Kelas {currentKelas?.nama} ({currentMapel?.nama})</strong> yang baru saja diinput atau diubah dan belum disimpan. Apakah Anda ingin menyimpan nilai tersebut sebelum berpindah ke {pendingSwitch.type === 'kelas' ? 'rombel lain' : 'mata pelajaran lain'}?
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setPendingSwitch(null)}
+                className="px-3.5 py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal (Tetap di Sini)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSwitchWithoutSave}
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 transition cursor-pointer"
+              >
+                Pindah Tanpa Menyimpan
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSwitchWithSave}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/30 transition flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Simpan Semua & Pindah</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification Setelah Berhasil Sinkron */}
+      {isSavedToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 border border-emerald-500/80 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-3 backdrop-blur-md animate-bounce">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white flex items-center space-x-1.5">
+              <span>Sinkronisasi Berhasil!</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30 font-mono">
+                {lastSyncedTime}
+              </span>
+            </p>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              {toastMsg || 'Data nilai siswa telah tersimpan dan disinkronkan ke Cloud & Rapor.'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

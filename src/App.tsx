@@ -38,12 +38,19 @@ import {
   initializeCloudDatabase,
   subscribeToRealtimeCloudData,
   saveSchoolInfoCloud,
+  saveSingleGuruCloud,
   saveGurusCloud,
+  saveSingleKelasCloud,
   saveKelasCloud,
+  saveSingleMapelCloud,
   saveMapelCloud,
+  saveSingleSiswaCloud,
   saveSiswaCloud,
+  saveSingleSubjectConfigCloud,
   saveSubjectConfigsCloud,
   saveScoresCloud,
+  saveClassMapelScoresCloud,
+  saveClassPresensiCloud,
   savePresensiCloud,
   deleteGuruCloud,
   deleteSiswaCloud,
@@ -119,12 +126,19 @@ export default function App() {
     }
   }, [kelasList, selectedKelasId]);
 
+  // Guard role guru dari akses tab Data Master
+  useEffect(() => {
+    if (currentUser?.role === 'guru' && ['guru', 'siswa', 'kelas', 'mapel'].includes(activeTab)) {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser, activeTab]);
+
   // Connect to Firebase Firestore & Listen to Real-Time Updates
   useEffect(() => {
     // 1. Initialize cloud database & seed if empty
     initializeCloudDatabase();
 
-    // Ensure KOP header is set to Lombok Utara by default
+    // Ensure KOP header is set to Lombok Utara by default locally if empty
     setSchoolInfo((prev) => {
       const cleanKop2 = (prev.kopInstansi2 || 'Dinas Pendidikan, Kebudayaan, Pemuda dan Olahraga (Dikbudpora)').replace(/\s*Kabupaten Lombok Utara\s*$/i, '');
       if (
@@ -133,15 +147,13 @@ export default function App() {
         prev.kopInstansi1.includes('DKI') ||
         prev.kopInstansi2?.includes('Kabupaten Lombok Utara')
       ) {
-        const next = {
+        return {
           ...prev,
           kopInstansi1: 'PEMERINTAH KABUPATEN LOMBOK UTARA',
           kopInstansi2: cleanKop2,
           kabupatenKota: prev.kabupatenKota && !prev.kabupatenKota.includes('Jakarta') ? prev.kabupatenKota : 'Kabupaten Lombok Utara',
           provinsi: prev.provinsi && !prev.provinsi.includes('DKI') ? prev.provinsi : 'Nusa Tenggara Barat',
         };
-        saveSchoolInfoCloud(next);
-        return next;
       }
       return prev;
     });
@@ -177,11 +189,12 @@ export default function App() {
     saveSchoolInfoCloud(info);
   };
 
-  // Handlers for Guru
+  // Handlers for Guru (Targeted writes to avoid overwriting other teachers)
   const handleAddGuru = (newG: Guru) => {
     const updated = [...guruList, newG];
     setGuruList(updated);
-    saveGurusCloud(updated);
+    saveGuruList(updated);
+    saveSingleGuruCloud(newG);
   };
 
   const handleAddBatchGuru = (newGurus: Guru[]) => {
@@ -193,7 +206,8 @@ export default function App() {
   const handleUpdateGuru = (updatedG: Guru) => {
     const updated = guruList.map((g) => (g.id === updatedG.id ? updatedG : g));
     setGuruList(updated);
-    saveGurusCloud(updated);
+    saveGuruList(updated);
+    saveSingleGuruCloud(updatedG);
   };
 
   const handleDeleteGuru = (id: string) => {
@@ -213,11 +227,12 @@ export default function App() {
     alert('Seluruh data guru demo berhasil dihapus permanen dari Cloud dan Lokal!');
   };
 
-  // Handlers for Kelas
+  // Handlers for Kelas (Targeted writes)
   const handleAddKelas = (newK: Kelas) => {
     const updated = [...kelasList, newK];
     setKelasList(updated);
-    saveKelasCloud(updated);
+    saveKelasList(updated);
+    saveSingleKelasCloud(newK);
     setSelectedKelasId(newK.id);
   };
 
@@ -230,7 +245,8 @@ export default function App() {
   const handleUpdateKelas = (updatedK: Kelas) => {
     const updated = kelasList.map((k) => (k.id === updatedK.id ? updatedK : k));
     setKelasList(updated);
-    saveKelasCloud(updated);
+    saveKelasList(updated);
+    saveSingleKelasCloud(updatedK);
   };
 
   const handleDeleteKelas = (id: string) => {
@@ -243,17 +259,19 @@ export default function App() {
     }
   };
 
-  // Handlers for Mapel
+  // Handlers for Mapel (Targeted writes)
   const handleAddMapel = (newM: MataPelajaran) => {
     const updated = [...mapelList, newM];
     setMapelList(updated);
-    saveMapelCloud(updated);
+    saveMapelList(updated);
+    saveSingleMapelCloud(newM);
   };
 
   const handleUpdateMapel = (updatedM: MataPelajaran) => {
     const updated = mapelList.map((m) => (m.id === updatedM.id ? updatedM : m));
     setMapelList(updated);
-    saveMapelCloud(updated);
+    saveMapelList(updated);
+    saveSingleMapelCloud(updatedM);
   };
 
   const handleDeleteMapel = (id: string) => {
@@ -263,11 +281,12 @@ export default function App() {
     deleteMapelCloud(id);
   };
 
-  // Handlers for Siswa
+  // Handlers for Siswa (Targeted writes)
   const handleAddSiswa = (newS: Siswa) => {
     const updated = [...siswaList, newS];
     setSiswaList(updated);
-    saveSiswaCloud(updated);
+    saveSiswaList(updated);
+    saveSingleSiswaCloud(newS);
   };
 
   const handleAddBatchSiswa = (newStudents: Siswa[]) => {
@@ -279,7 +298,8 @@ export default function App() {
   const handleUpdateSiswa = (updatedS: Siswa) => {
     const updated = siswaList.map((s) => (s.id === updatedS.id ? updatedS : s));
     setSiswaList(updated);
-    saveSiswaCloud(updated);
+    saveSiswaList(updated);
+    saveSingleSiswaCloud(updatedS);
   };
 
   const handleDeleteSiswa = (id: string) => {
@@ -335,14 +355,14 @@ export default function App() {
     alert('Seluruh data siswa demo berhasil dihapus permanen dari Cloud dan Lokal!');
   };
 
-  // Handlers for Subject Config & Scores
+  // Handlers for Subject Config & Scores (Targeted single write)
   const handleSaveConfig = (newConf: SubjectConfig) => {
     const filtered = subjectConfigs.filter(
       (c) => !(c.kelasId === newConf.kelasId && c.mapelId === newConf.mapelId)
     );
     const updated = [...filtered, newConf];
     setSubjectConfigs(updated);
-    saveSubjectConfigsCloud(updated);
+    saveSingleSubjectConfigCloud(newConf);
   };
 
   const handleSaveScores = (newScores: NilaiRecord[]) => {
@@ -350,10 +370,43 @@ export default function App() {
     saveScoresCloud(newScores);
   };
 
-  // Handlers for Presensi
-  const handleSavePresensi = (newPresensi: PresensiCatatan[]) => {
+  const handleSaveClassMapel = async (
+    kelasId: string,
+    mapelId: string,
+    updatedClassScores: NilaiRecord[],
+    config: SubjectConfig
+  ): Promise<{ success: boolean; syncedCount: number; error?: string }> => {
+    const otherScores = scoresList.filter(
+      (r) => !(r.kelasId === kelasId && r.mapelId === mapelId)
+    );
+    const allUpdatedScores = [...otherScores, ...updatedClassScores];
+    setScoresList(allUpdatedScores);
+
+    const otherConfigs = subjectConfigs.filter(
+      (c) => !(c.kelasId === kelasId && c.mapelId === mapelId)
+    );
+    const allUpdatedConfigs = [...otherConfigs, config];
+    setSubjectConfigs(allUpdatedConfigs);
+
+    return await saveClassMapelScoresCloud(
+      kelasId,
+      mapelId,
+      updatedClassScores,
+      config,
+      allUpdatedScores,
+      allUpdatedConfigs
+    );
+  };
+
+  // Handlers for Presensi (Targeted class write so classes don't overwrite each other)
+  const handleSavePresensi = (newPresensi: PresensiCatatan[], kelasId?: string) => {
     setPresensiList(newPresensi);
-    savePresensiCloud(newPresensi);
+    if (kelasId) {
+      const classItems = newPresensi.filter((p) => p.kelasId === kelasId);
+      saveClassPresensiCloud(kelasId, classItems, newPresensi);
+    } else {
+      savePresensiCloud(newPresensi);
+    }
   };
 
   // Reset to Demo
@@ -528,6 +581,7 @@ export default function App() {
               scoresList={scoresList}
               onSaveScores={handleSaveScores}
               onSaveConfig={handleSaveConfig}
+              onSaveClassMapel={handleSaveClassMapel}
             />
           )}
 
@@ -569,7 +623,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'guru' && (
+          {currentUser?.role === 'admin' && activeTab === 'guru' && (
             <DataGuruView
               guruList={guruList}
               onAddGuru={handleAddGuru}
@@ -580,7 +634,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'siswa' && (
+          {currentUser?.role === 'admin' && activeTab === 'siswa' && (
             <DataSiswaView
               kelasList={kelasList}
               selectedKelasId={selectedKelasId}
@@ -596,7 +650,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'kelas' && (
+          {currentUser?.role === 'admin' && activeTab === 'kelas' && (
             <DataKelasView
               kelasList={kelasList}
               siswaList={siswaList}
@@ -607,7 +661,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'mapel' && (
+          {currentUser?.role === 'admin' && activeTab === 'mapel' && (
             <DataMapelView
               mapelList={mapelList}
               onAddMapel={handleAddMapel}
