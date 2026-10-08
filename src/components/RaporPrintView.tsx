@@ -225,11 +225,6 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
               <span className="mr-2">:</span>
               <span>{siswa.jenisKelamin === 'L' ? 'Laki-Laki' : 'Perempuan'}</span>
             </div>
-            <div className="flex">
-              <span className="w-36 font-semibold">Agama</span>
-              <span className="mr-2">:</span>
-              <span className="font-semibold">{siswa.agama || 'Islam'}</span>
-            </div>
           </div>
 
           <div className="space-y-1">
@@ -239,14 +234,14 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
               <span className="font-bold">{currentKelas.nama}</span>
             </div>
             <div className="flex">
-              <span className="w-32 font-semibold">Fase / Kurikulum</span>
-              <span className="mr-2">:</span>
-              <span>{schoolInfo.kurikulum}</span>
-            </div>
-            <div className="flex">
               <span className="w-32 font-semibold">Wali Kelas</span>
               <span className="mr-2">:</span>
               <span>{currentKelas.waliKelas}</span>
+            </div>
+            <div className="flex">
+              <span className="w-32 font-semibold">Agama</span>
+              <span className="mr-2">:</span>
+              <span className="font-semibold">{siswa.agama || 'Islam'}</span>
             </div>
           </div>
         </div>
