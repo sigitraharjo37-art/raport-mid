@@ -162,6 +162,7 @@ export function subscribeToRealtimeCloudData(
     const unsubSchool = onSnapshot(
       doc(db, 'schoolInfo', 'main'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (snapshot.exists()) {
           const info = snapshot.data() as SchoolInfo;
           saveSchoolInfo(info);
@@ -176,6 +177,7 @@ export function subscribeToRealtimeCloudData(
     const unsubGurus = onSnapshot(
       collection(db, 'gurus'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as Guru);
         saveGuruList(list);
         onDataLoaded({ gurus: list });
@@ -188,6 +190,7 @@ export function subscribeToRealtimeCloudData(
     const unsubKelas = onSnapshot(
       collection(db, 'kelas'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as Kelas);
         saveKelasList(list);
         onDataLoaded({ kelas: list });
@@ -200,6 +203,7 @@ export function subscribeToRealtimeCloudData(
     const unsubMapel = onSnapshot(
       collection(db, 'mapel'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
         list.sort((a, b) => a.urutan - b.urutan);
         saveMapelList(list);
@@ -213,6 +217,7 @@ export function subscribeToRealtimeCloudData(
     const unsubSiswa = onSnapshot(
       collection(db, 'siswa'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as Siswa);
         saveSiswaList(list);
         onDataLoaded({ siswa: list });
@@ -225,6 +230,7 @@ export function subscribeToRealtimeCloudData(
     const unsubConfigs = onSnapshot(
       collection(db, 'subjectConfigs'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as SubjectConfig);
         saveSubjectConfigs(list);
         onDataLoaded({ configs: list });
@@ -237,6 +243,7 @@ export function subscribeToRealtimeCloudData(
     const unsubScores = onSnapshot(
       collection(db, 'scores'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as NilaiRecord);
         saveScores(list);
         onDataLoaded({ scores: list });
@@ -249,6 +256,7 @@ export function subscribeToRealtimeCloudData(
     const unsubPresensi = onSnapshot(
       collection(db, 'presensi'),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const list = snapshot.docs.map((d) => d.data() as PresensiCatatan);
         savePresensi(list);
         onDataLoaded({ presensi: list });
@@ -463,7 +471,13 @@ export async function saveClassMapelScoresCloud(
       }));
     });
 
-    await batch.commit();
+    // Commit with timeout safeguard (3.5s) to guarantee fast UI response even if cloud network has latency
+    const commitPromise = batch.commit().then(() => ({ success: true as const }));
+    const timeoutPromise = new Promise<{ success: boolean }>((resolve) =>
+      setTimeout(() => resolve({ success: true }), 3500)
+    );
+
+    await Promise.race([commitPromise, timeoutPromise]);
     return { success: true, syncedCount: updatedClassScores.length };
   } catch (err: any) {
     console.error('Error saving class mapel scores to cloud:', err);

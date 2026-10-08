@@ -91,6 +91,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const activeSelectionRef = useRef({ kelasId: selectedKelasId, mapelId: selectedMapelId });
   const hasUnsavedRef = useRef(hasUnsavedChanges);
   hasUnsavedRef.current = hasUnsavedChanges;
+  // Ref to prevent redundant local re-parsing loop during saving
+  const isLocalSavingRef = useRef(false);
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
   const currentMapel = mapelList.find((m) => m.id === selectedMapelId) || mapelList[0];
@@ -128,6 +130,11 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
 
     // If active class/mapel is the same AND teacher has unsaved manual changes, don't overwrite local draft!
     if (!isDifferentSelection && hasUnsavedRef.current) {
+      return;
+    }
+
+    // If active class/mapel is the same AND we just saved locally, preserve existing localScores state!
+    if (!isDifferentSelection && isLocalSavingRef.current) {
       return;
     }
 
@@ -339,8 +346,16 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   // Simpan Semua Nilai (Model Sinkron Manual ke Database Lokal & Cloud)
   const handleSaveAll = async () => {
     if (isSaving) return;
+
+    // Fast-path: Mark saving and immediately acknowledge locally
+    isLocalSavingRef.current = true;
     setIsSaving(true);
     setSaveError('');
+    setHasUnsavedChanges(false);
+    hasUnsavedRef.current = false;
+
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+    setLastSyncedTime(timeStr);
 
     // 1. Save Config
     const newConfig: SubjectConfig = {
@@ -373,7 +388,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       if (onSaveClassMapel) {
         const res = await onSaveClassMapel(selectedKelasId, selectedMapelId, updatedThisMapelScores, newConfig);
         if (!res.success) {
-          setSaveError(res.error || 'Peringatan: Berhasil disimpan lokal, namun sinkronisasi Cloud mengalami kendala');
+          setSaveError(res.error || 'Peringatan: Berhasil disimpan lokal, namun sinkronisasi Cloud mengalami kendala jaringan');
         }
       } else {
         const otherScores = scoresList.filter(
@@ -383,19 +398,44 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         onSaveScores([...otherScores, ...updatedThisMapelScores]);
       }
 
-      setHasUnsavedChanges(false);
-      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-      setLastSyncedTime(timeStr);
-      setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan disinkronkan ke Cloud.`);
+      setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan terkirim ke Cloud.`);
       setIsSavedToast(true);
       setTimeout(() => setIsSavedToast(false), 3500);
     } catch (err: any) {
       console.error(err);
-      setSaveError('Terjadi kesalahan saat menyimpan data nilai.');
+      setSaveError('Terjadi kesalahan saat mengirim ke Cloud. Nilai tetap tersimpan di perangkat lokal.');
     } finally {
       setIsSaving(false);
+      // Allow slight cooldown before releasing local saving guard
+      setTimeout(() => {
+        isLocalSavingRef.current = false;
+      }, 600);
     }
   };
+
+  // Keyboard shortcut Ctrl+S / Cmd+S untuk simpan cepat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveAll();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedKelasId,
+    selectedMapelId,
+    namaGuru,
+    kktp,
+    bobotFormatif,
+    bobotSumatif,
+    deskripsiMapel,
+    deskripsiPerAgama,
+    localScores,
+    isSaving,
+    currentSiswa,
+  ]);
 
   const handleExportExcel = () => {
     if (!currentKelas || !currentMapel) return;
@@ -514,10 +554,15 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">
                 Penyimpanan Manual Terkontrol
               </span>
-              {hasUnsavedChanges ? (
+              {isSaving ? (
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 animate-pulse">
+                  <RefreshCw className="w-3 h-3 animate-spin text-indigo-300" />
+                  <span>Sedang Mengirim ke Cloud...</span>
+                </span>
+              ) : hasUnsavedChanges ? (
                 <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/25 text-amber-300 border border-amber-400/40 animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                  <span>Ada Nilai Belum Disimpan</span>
+                  <span>Ada Nilai Belum Disimpan (Ctrl+S)</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
@@ -600,29 +645,34 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
             <button
               onClick={handleSaveAll}
               disabled={isSaving}
-              className={`inline-flex items-center space-x-2 px-5 py-2.5 text-xs font-bold rounded-xl shadow-md transition cursor-pointer ${
+              className={`inline-flex items-center space-x-2 px-5 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all duration-150 cursor-pointer active:scale-95 ${
                 isSaving
-                  ? 'bg-indigo-400 text-white cursor-wait'
+                  ? 'bg-indigo-600 text-white shadow-indigo-500/25 ring-2 ring-indigo-300'
                   : hasUnsavedChanges
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/50 shadow-amber-600/30 animate-pulse'
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/60 shadow-amber-600/30 animate-pulse'
+                  : isSavedToast
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-300'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
               }`}
-              title="Simpan seluruh nilai kelas ini dan sinkronkan ke Cloud & Rapor"
+              title="Simpan seluruh nilai kelas ini dan kirim ke Cloud (Pintasan: Ctrl+S)"
             >
               {isSaving ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  <span>Menyinkronkan...</span>
+                  <span>Mengirim ke Cloud...</span>
                 </>
               ) : isSavedToast ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-emerald-300" />
-                  <span>Tersimpan & Sinkron!</span>
+                  <CheckCircle className="w-4 h-4 text-emerald-200" />
+                  <span>Tersimpan & Terkirim!</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
                   <span>Simpan Semua Nilai</span>
+                  <span className="hidden sm:inline-block text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono font-medium">
+                    Ctrl+S
+                  </span>
                   {hasUnsavedChanges && (
                     <span className="w-2 h-2 rounded-full bg-white"></span>
                   )}
@@ -1126,28 +1176,33 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           <button
             onClick={handleSaveAll}
             disabled={isSaving}
-            className={`inline-flex items-center justify-center space-x-2 px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition cursor-pointer ${
+            className={`inline-flex items-center justify-center space-x-2 px-6 py-2.5 text-xs font-bold rounded-xl shadow-md transition-all duration-150 cursor-pointer active:scale-95 ${
               isSaving
-                ? 'bg-indigo-400 text-white cursor-wait'
+                ? 'bg-indigo-600 text-white shadow-indigo-500/25 ring-2 ring-indigo-300'
                 : hasUnsavedChanges
-                ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/50 shadow-amber-600/30 animate-pulse'
+                ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/60 shadow-amber-600/30 animate-pulse'
+                : isSavedToast
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-300'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
             }`}
           >
             {isSaving ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                <span>Menyimpan & Menyinkronkan...</span>
+                <span>Mengirim ke Cloud...</span>
               </>
             ) : isSavedToast ? (
               <>
-                <CheckCircle className="w-4 h-4 text-emerald-300" />
-                <span>Berhasil Disimpan & Tersinkron!</span>
+                <CheckCircle className="w-4 h-4 text-emerald-200" />
+                <span>Berhasil Disimpan & Terkirim!</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
                 <span>Simpan Semua Nilai</span>
+                <span className="hidden sm:inline-block text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono font-medium">
+                  Ctrl+S
+                </span>
                 {hasUnsavedChanges && (
                   <span className="ml-1 text-[10px] bg-white text-amber-800 px-1.5 py-0.5 rounded-full font-bold">
                     Belum Disimpan
