@@ -259,26 +259,33 @@ export default function App() {
     }
   };
 
-  // Handlers for Mapel (Targeted writes)
-  const handleAddMapel = (newM: MataPelajaran) => {
+  // Handlers for Mapel (Targeted writes + Full Cloud List Synchronization)
+  const handleAddMapel = async (newM: MataPelajaran) => {
     const updated = [...mapelList, newM];
     setMapelList(updated);
     saveMapelList(updated);
-    saveSingleMapelCloud(newM);
+    await saveSingleMapelCloud(newM);
+    saveMapelCloud(updated);
   };
 
-  const handleUpdateMapel = (updatedM: MataPelajaran) => {
+  const handleUpdateMapel = async (updatedM: MataPelajaran) => {
     const updated = mapelList.map((m) => (m.id === updatedM.id ? updatedM : m));
     setMapelList(updated);
     saveMapelList(updated);
-    saveSingleMapelCloud(updatedM);
+    await saveSingleMapelCloud(updatedM);
+    saveMapelCloud(updated);
   };
 
-  const handleDeleteMapel = (id: string) => {
+  const handleDeleteMapel = async (id: string) => {
     const updated = mapelList.filter((m) => m.id !== id);
     setMapelList(updated);
     saveMapelList(updated);
-    deleteMapelCloud(id);
+    await deleteMapelCloud(id);
+    saveMapelCloud(updated);
+  };
+
+  const handleSyncMapelCloud = async () => {
+    await saveMapelCloud(mapelList);
   };
 
   // Handlers for Siswa (Targeted writes)
@@ -667,6 +674,7 @@ export default function App() {
               onAddMapel={handleAddMapel}
               onUpdateMapel={handleUpdateMapel}
               onDeleteMapel={handleDeleteMapel}
+              onSyncCloud={handleSyncMapelCloud}
             />
           )}
         </main>

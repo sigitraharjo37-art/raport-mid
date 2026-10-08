@@ -58,31 +58,50 @@ export interface CloudSyncState {
 export async function initializeCloudDatabase(): Promise<boolean> {
   try {
     await testFirestoreConnection();
+
+    // 1. Ensure school info exists in cloud
     const schoolDoc = await getDoc(doc(db, 'schoolInfo', 'main'));
-
     if (!schoolDoc.exists()) {
-      // First time ever initialization
-      const currentSchool = loadSchoolInfo();
-      const currentGurus = loadGuruList();
-      const currentKelas = loadKelasList();
-      const currentMapel = loadMapelList();
-      const currentSiswa = loadSiswaList();
-      const currentConfigs = loadSubjectConfigs();
-      const currentScores = loadScores();
-      const currentPresensi = loadPresensi();
-
-      await syncAllToCloud({
-        schoolInfo: currentSchool,
-        gurus: currentGurus,
-        kelas: currentKelas,
-        mapel: currentMapel,
-        siswa: currentSiswa,
-        configs: currentConfigs,
-        scores: currentScores,
-        presensi: currentPresensi,
-      });
-      markAppInitialized();
+      await saveSchoolInfoCloud(loadSchoolInfo());
     }
+
+    // 2. Ensure mapel collection exists and is seeded in cloud
+    const mapelSnap = await getDocs(collection(db, 'mapel'));
+    if (mapelSnap.empty) {
+      const currentMapel = loadMapelList();
+      if (currentMapel.length > 0) {
+        await saveMapelCloud(currentMapel);
+      }
+    }
+
+    // 3. Ensure kelas collection exists in cloud
+    const kelasSnap = await getDocs(collection(db, 'kelas'));
+    if (kelasSnap.empty) {
+      const currentKelas = loadKelasList();
+      if (currentKelas.length > 0) {
+        await saveKelasCloud(currentKelas);
+      }
+    }
+
+    // 4. Ensure gurus collection exists in cloud
+    const gurusSnap = await getDocs(collection(db, 'gurus'));
+    if (gurusSnap.empty) {
+      const currentGurus = loadGuruList();
+      if (currentGurus.length > 0) {
+        await saveGurusCloud(currentGurus);
+      }
+    }
+
+    // 5. Ensure siswa collection exists in cloud
+    const siswaSnap = await getDocs(collection(db, 'siswa'));
+    if (siswaSnap.empty) {
+      const currentSiswa = loadSiswaList();
+      if (currentSiswa.length > 0) {
+        await saveSiswaCloud(currentSiswa);
+      }
+    }
+
+    markAppInitialized();
     return true;
   } catch (err: any) {
     console.error('Failed to initialize cloud database:', err);
@@ -178,6 +197,11 @@ export function subscribeToRealtimeCloudData(
       collection(db, 'gurus'),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
+        if (snapshot.empty) {
+          const local = loadGuruList();
+          if (local.length > 0) saveGurusCloud(local);
+          return;
+        }
         const list = snapshot.docs.map((d) => d.data() as Guru);
         saveGuruList(list);
         onDataLoaded({ gurus: list });
@@ -191,6 +215,11 @@ export function subscribeToRealtimeCloudData(
       collection(db, 'kelas'),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
+        if (snapshot.empty) {
+          const local = loadKelasList();
+          if (local.length > 0) saveKelasCloud(local);
+          return;
+        }
         const list = snapshot.docs.map((d) => d.data() as Kelas);
         saveKelasList(list);
         onDataLoaded({ kelas: list });
@@ -199,11 +228,16 @@ export function subscribeToRealtimeCloudData(
     );
     unsubscribers.push(unsubKelas);
 
-    // 4. Mapel Listener
+    // 4. Mapel Listener (Syncs additions, edits, and deletions)
     const unsubMapel = onSnapshot(
       collection(db, 'mapel'),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
+        if (snapshot.empty) {
+          const local = loadMapelList();
+          if (local.length > 0) saveMapelCloud(local);
+          return;
+        }
         const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
         list.sort((a, b) => a.urutan - b.urutan);
         saveMapelList(list);
@@ -218,6 +252,11 @@ export function subscribeToRealtimeCloudData(
       collection(db, 'siswa'),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
+        if (snapshot.empty) {
+          const local = loadSiswaList();
+          if (local.length > 0) saveSiswaCloud(local);
+          return;
+        }
         const list = snapshot.docs.map((d) => d.data() as Siswa);
         saveSiswaList(list);
         onDataLoaded({ siswa: list });

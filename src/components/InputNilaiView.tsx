@@ -98,6 +98,18 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
   const currentMapel = mapelList.find((m) => m.id === selectedMapelId) || mapelList[0];
   const currentSiswa = siswaList.filter((s) => s.kelasId === selectedKelasId);
 
+  // Deteksi apakah mapel yang dipilih adalah mata pelajaran Agama (PAI, PAIBP, Pendidikan Agama, dll.)
+  const isMapelAgama = Boolean(
+    currentMapel && (
+      currentMapel.nama.toLowerCase().includes('agama') ||
+      currentMapel.kode.toLowerCase().includes('pai') ||
+      currentMapel.kode.toLowerCase().includes('agm') ||
+      currentMapel.kode.toLowerCase().includes('pabp') ||
+      currentMapel.id.toLowerCase().includes('pai') ||
+      currentMapel.id.toLowerCase().includes('agama')
+    )
+  );
+
   // Sort guru list ascending A-Z by name
   const sortedGuruList = [...guruList].sort((a, b) =>
     a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
@@ -237,9 +249,11 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         const akhir = item.akhir;
         const sAgama = s.agama || 'Islam';
 
-        // Ambil materi per agama jika diisi guru, atau fallback ke deskripsi umum
+        // Ambil materi per agama jika mapel agama, atau materi umum jika mapel selain agama
         const agamaMateri = deskripsiPerAgama[sAgama]?.trim();
-        const materiText = agamaMateri || deskripsiMapel.trim() || `materi pokok dan capaian pembelajaran ${mapelName}`;
+        const materiText = isMapelAgama
+          ? (agamaMateri || `materi pokok dan capaian pembelajaran ${mapelName} (${sAgama})`)
+          : (deskripsiMapel.trim() || `materi pokok dan capaian pembelajaran ${mapelName}`);
 
         // Jika nilai masih 0 (belum dinilai), kosongkan capaian
         if (akhir === 0) {
@@ -852,141 +866,146 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
           )}
         </div>
 
-        {/* Input Deskripsi / Tujuan Pembelajaran STS */}
-        <div className="mt-4 pt-4 border-t border-indigo-800/80">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-            <label className="text-xs font-bold text-amber-300 flex items-center space-x-1.5 uppercase tracking-wide">
-              <FileText className="w-4 h-4 text-amber-400" />
-              <span>Input Deskripsi / Lingkup Materi Tujuan Pembelajaran (TP) STS:</span>
-            </label>
-            <button
-              type="button"
-              onClick={handleGenerateDeskripsiAll}
-              className="inline-flex items-center space-x-1 px-3 py-1 bg-indigo-700/70 hover:bg-indigo-600 text-white rounded-lg text-xs font-semibold border border-indigo-500/50 shadow-xs transition"
-              title="Terapkan deskripsi materi ini ke seluruh siswa kelas berdasarkan capaian KKTP mereka"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Terapkan Deskripsi ke Semua Siswa</span>
-            </button>
-          </div>
-          <textarea
-            rows={2}
-            value={deskripsiMapel}
-            onChange={(e) => setDeskripsiMapel(e.target.value)}
-            placeholder="Contoh: Menyelesaikan operasi hitung bilangan bulat, pecahan, serta penyederhanaan bentuk aljabar."
-            className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
-          />
-          <p className="text-[11px] text-indigo-300/80 mt-1">
-            Deskripsi umum ini digunakan sebagai dasar kalimat capaian kompetensi pada rapor siswa ({currentMapel?.nama}).
-          </p>
-        </div>
-
-        {/* Input Deskripsi / TP Per Agama */}
-        <div className="mt-5 pt-4 border-t border-indigo-800/80">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-            <div>
+        {/* Input Deskripsi / Tujuan Pembelajaran STS (HANYA MUNCUL JIKA BUKAN MAPEL AGAMA) */}
+        {!isMapelAgama && (
+          <div className="mt-4 pt-4 border-t border-indigo-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <label className="text-xs font-bold text-amber-300 flex items-center space-x-1.5 uppercase tracking-wide">
-                <BookOpen className="w-4 h-4 text-amber-400" />
-                <span>Input Deskripsi Capaian Pembelajaran Tiap Agama:</span>
+                <FileText className="w-4 h-4 text-amber-400" />
+                <span>Input Deskripsi / Lingkup Materi Tujuan Pembelajaran (TP) STS:</span>
               </label>
-              <p className="text-[11px] text-indigo-300/80 mt-0.5">
-                Deskripsi akan otomatis disesuaikan dan dicetak di lembar rapor sesuai agama masing-masing peserta didik.
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
               <button
                 type="button"
-                onClick={handleFillAllExampleAgama}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg text-xs font-semibold border border-amber-400/30 transition shadow-xs"
-                title="Muat deskripsi standar Kurikulum Merdeka untuk seluruh 6 agama"
+                onClick={handleGenerateDeskripsiAll}
+                className="inline-flex items-center space-x-1 px-3 py-1 bg-indigo-700/70 hover:bg-indigo-600 text-white rounded-lg text-xs font-semibold border border-indigo-500/50 shadow-xs transition cursor-pointer"
+                title="Terapkan deskripsi materi ini ke seluruh siswa kelas berdasarkan capaian KKTP mereka"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Muat Standar Semua Agama</span>
+                <span>Terapkan Deskripsi ke Semua Siswa</span>
               </button>
             </div>
+            <textarea
+              rows={2}
+              value={deskripsiMapel}
+              onChange={(e) => setDeskripsiMapel(e.target.value)}
+              placeholder="Contoh: Menyelesaikan operasi hitung bilangan bulat, pecahan, serta penyederhanaan bentuk aljabar."
+              className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
+            />
+            <p className="text-[11px] text-indigo-300/80 mt-1">
+              Deskripsi umum ini digunakan sebagai dasar kalimat capaian kompetensi pada rapor siswa ({currentMapel?.nama}).
+            </p>
           </div>
+        )}
 
-          {/* Tab Selector Tiap Agama */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-3 bg-slate-900/60 p-1.5 rounded-xl border border-indigo-900/80">
-            {DAFTAR_AGAMA.map((agama) => {
-              const countInClass = currentSiswa.filter((s) => (s.agama || 'Islam') === agama).length;
-              const isFilled = !!deskripsiPerAgama[agama]?.trim();
-              const isActive = activeAgamaTab === agama;
-
-              return (
-                <button
-                  key={agama}
-                  type="button"
-                  onClick={() => setActiveAgamaTab(agama)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
-                    isActive
-                      ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-extrabold'
-                      : 'text-indigo-200 hover:bg-white/10'
-                  }`}
-                >
-                  <span>{agama}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold ${
-                      isActive
-                        ? 'bg-black/20 text-slate-900'
-                        : countInClass > 0
-                        ? 'bg-indigo-600/80 text-white'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {countInClass} siswa
-                  </span>
-                  {isFilled && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Deskripsi terisi" />}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Religion Description Textarea & Action Bar */}
-          <div className="bg-slate-950/40 p-3.5 rounded-xl border border-indigo-800/60 space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5 flex-wrap">
-                <span>Deskripsi Materi Pembelajaran untuk Siswa Beragama:</span>
-                <span className="font-extrabold text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/30">
-                  {activeAgamaTab}
-                </span>
-                <span className="text-slate-400 text-[11px]">
-                  ({currentSiswa.filter((s) => (s.agama || 'Islam') === activeAgamaTab).length} siswa di Kelas {currentKelas?.nama})
-                </span>
-              </span>
-
+        {/* Input Deskripsi / TP Per Agama (HANYA MUNCUL JIKA MATA PELAJARAN AGAMA) */}
+        {isMapelAgama && (
+          <div className="mt-5 pt-4 border-t border-indigo-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div>
+                <label className="text-xs font-bold text-amber-300 flex items-center space-x-1.5 uppercase tracking-wide">
+                  <BookOpen className="w-4 h-4 text-amber-400" />
+                  <span>Input Deskripsi Capaian Pembelajaran Tiap Agama:</span>
+                </label>
+                <p className="text-[11px] text-indigo-300/80 mt-0.5">
+                  Deskripsi akan otomatis disesuaikan dan dicetak di lembar rapor sesuai agama masing-masing peserta didik.
+                </p>
+              </div>
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => handleSetAgamaDeskripsi(activeAgamaTab, CONTOH_DESKRIPSI_AGAMA[activeAgamaTab] || '')}
-                  className="text-[11px] px-2 py-0.5 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-200 rounded border border-indigo-600 transition"
-                  title="Gunakan kalimat materi standar Kurikulum Merdeka"
+                  onClick={handleFillAllExampleAgama}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg text-xs font-semibold border border-amber-400/30 transition shadow-xs cursor-pointer"
+                  title="Muat deskripsi standar Kurikulum Merdeka untuk seluruh 6 agama"
                 >
-                  Gunakan Rekomendasi {activeAgamaTab}
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Muat Standar Semua Agama</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleCopyFromGeneral(activeAgamaTab)}
-                  className="text-[11px] px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-600 transition"
-                  title="Salin isi deskripsi umum ke agama ini"
+                  onClick={handleGenerateDeskripsiAll}
+                  className="inline-flex items-center space-x-1 px-3 py-1 bg-indigo-700/70 hover:bg-indigo-600 text-white rounded-lg text-xs font-semibold border border-indigo-500/50 shadow-xs transition cursor-pointer"
+                  title="Terapkan deskripsi materi per agama ini ke seluruh siswa kelas berdasarkan capaian KKTP mereka"
                 >
-                  Salin dari Deskripsi Umum
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Terapkan ke Siswa</span>
                 </button>
               </div>
             </div>
 
-            <textarea
-              rows={2}
-              value={deskripsiPerAgama[activeAgamaTab] || ''}
-              onChange={(e) => handleSetAgamaDeskripsi(activeAgamaTab, e.target.value)}
-              placeholder={`Contoh deskripsi capaian pembelajaran bagi siswa beragama ${activeAgamaTab}...`}
-              className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
-            />
-            <p className="text-[11px] text-amber-200/80">
-              💡 Klik tombol <strong>"Terapkan Deskripsi ke Semua Siswa"</strong> di atas atau <strong>"Auto Deskripsi"</strong> agar kalimat capaian otomatis tersusun sesuai nilai & agama masing-masing siswa.
-            </p>
+            {/* Tab Selector Tiap Agama */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-3 bg-slate-900/60 p-1.5 rounded-xl border border-indigo-900/80">
+              {DAFTAR_AGAMA.map((agama) => {
+                const countInClass = currentSiswa.filter((s) => (s.agama || 'Islam') === agama).length;
+                const isFilled = !!deskripsiPerAgama[agama]?.trim();
+                const isActive = activeAgamaTab === agama;
+
+                return (
+                  <button
+                    key={agama}
+                    type="button"
+                    onClick={() => setActiveAgamaTab(agama)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                      isActive
+                        ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-extrabold'
+                        : 'text-indigo-200 hover:bg-white/10'
+                    }`}
+                  >
+                    <span>{agama}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold ${
+                        isActive
+                          ? 'bg-black/20 text-slate-900'
+                          : countInClass > 0
+                          ? 'bg-indigo-600/80 text-white'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {countInClass} siswa
+                    </span>
+                    {isFilled && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Deskripsi terisi" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Religion Description Textarea & Action Bar */}
+            <div className="bg-slate-950/40 p-3.5 rounded-xl border border-indigo-800/60 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5 flex-wrap">
+                  <span>Deskripsi Materi Pembelajaran untuk Siswa Beragama:</span>
+                  <span className="font-extrabold text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/30">
+                    {activeAgamaTab}
+                  </span>
+                  <span className="text-slate-400 text-[11px]">
+                    ({currentSiswa.filter((s) => (s.agama || 'Islam') === activeAgamaTab).length} siswa di Kelas {currentKelas?.nama})
+                  </span>
+                </span>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSetAgamaDeskripsi(activeAgamaTab, CONTOH_DESKRIPSI_AGAMA[activeAgamaTab] || '')}
+                    className="text-[11px] px-2 py-0.5 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-200 rounded border border-indigo-600 transition cursor-pointer"
+                    title="Gunakan kalimat materi standar Kurikulum Merdeka"
+                  >
+                    Gunakan Rekomendasi {activeAgamaTab}
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                rows={2}
+                value={deskripsiPerAgama[activeAgamaTab] || ''}
+                onChange={(e) => handleSetAgamaDeskripsi(activeAgamaTab, e.target.value)}
+                placeholder={`Contoh deskripsi capaian pembelajaran bagi siswa beragama ${activeAgamaTab}...`}
+                className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/70 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-amber-400 focus:outline-none leading-relaxed"
+              />
+              <p className="text-[11px] text-amber-200/80">
+                💡 Klik tombol <strong>"Terapkan ke Siswa"</strong> di atas atau <strong>"Auto Deskripsi"</strong> agar kalimat capaian otomatis tersusun sesuai nilai & agama masing-masing siswa.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Subject Stats Overview */}
