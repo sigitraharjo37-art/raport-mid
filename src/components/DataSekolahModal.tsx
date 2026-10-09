@@ -307,6 +307,19 @@ export const DataSekolahModal: React.FC<DataSekolahModalProps> = ({
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="smpn1cemerlang@edu.go.id"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Website / Web Resmi Sekolah</label>
+                <input
+                  type="text"
+                  name="website"
+                  value={formData.website || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Contoh: https://smpn1cemerlang.sch.id atau www.sekolah.sch.id"
                 />
               </div>
             </div>
