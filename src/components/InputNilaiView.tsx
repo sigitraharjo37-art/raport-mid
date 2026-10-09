@@ -147,8 +147,8 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       return;
     }
 
-    // If active class/mapel is the same AND we just saved locally, preserve existing localScores state!
-    if (!isDifferentSelection && isLocalSavingRef.current) {
+    // If active class/mapel is the same AND (we just saved locally OR user has unsaved edits in progress), preserve existing localScores state!
+    if (!isDifferentSelection && (isLocalSavingRef.current || hasUnsavedChanges)) {
       return;
     }
 
@@ -160,7 +160,9 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
     // Load config
     const conf = subjectConfigs.find((c) => c.kelasId === selectedKelasId && c.mapelId === selectedMapelId);
     if (conf) {
-      setNamaGuru(conf.namaGuru || '');
+      // Resolve latest teacher name from guruList if available
+      const matchedTeacher = sortedGuruList.find((g) => g.nama === conf.namaGuru);
+      setNamaGuru(matchedTeacher ? matchedTeacher.nama : (conf.namaGuru || ''));
       setKktp(conf.kktp ?? 75);
       setBobotFormatif(conf.bobotFormatif ?? 50);
       setBobotSumatif(conf.bobotSumatif ?? 50);
@@ -180,22 +182,20 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
       }
     }
 
-    // Load scores
+    // Load scores reliably for current students
     const temp: Record<string, { formatif: number; sumatif: number; akhir: number; capaian: string }> = {};
     currentSiswa.forEach((s) => {
       const rec = scoresList.find((r) => r.siswaId === s.id && r.mapelId === selectedMapelId);
-      if (rec && (rec.nilaiFormatif > 0 || rec.nilaiSumatif > 0 || rec.nilaiAkhir > 0 || (rec.capaianKompetensi && rec.capaianKompetensi.length > 0))) {
-        const fVal = rec.nilaiFormatif || 0;
-        const sVal = rec.nilaiSumatif || 0;
+      if (rec) {
+        const fVal = typeof rec.nilaiFormatif === 'number' && !isNaN(rec.nilaiFormatif) ? rec.nilaiFormatif : 0;
+        const sVal = typeof rec.nilaiSumatif === 'number' && !isNaN(rec.nilaiSumatif) ? rec.nilaiSumatif : 0;
+        const aVal = typeof rec.nilaiAkhir === 'number' && !isNaN(rec.nilaiAkhir) ? rec.nilaiAkhir : calculateAkhir(fVal, sVal);
         temp[s.id] = {
           formatif: fVal,
           sumatif: sVal,
-          akhir: calculateAkhir(fVal, sVal),
+          akhir: aVal,
           capaian: rec.capaianKompetensi || '',
         };
-      } else if (!isDifferentSelection && localScores[s.id] && (localScores[s.id].formatif > 0 || localScores[s.id].sumatif > 0 || localScores[s.id].akhir > 0 || localScores[s.id].capaian)) {
-        // Pertahankan nilai input lokal yang sudah dimasukkan agar tidak ter-reset hilang oleh sync cloud
-        temp[s.id] = localScores[s.id];
       } else {
         temp[s.id] = {
           formatif: 0,
@@ -416,6 +416,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         } else {
           setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan dan terkirim ke Cloud.`);
         }
+        setHasUnsavedChanges(false);
       } else {
         const otherScores = scoresList.filter(
           (r) => !(r.kelasId === selectedKelasId && r.mapelId === selectedMapelId)
@@ -423,6 +424,7 @@ export const InputNilaiView: React.FC<InputNilaiViewProps> = ({
         onSaveConfig(newConfig);
         onSaveScores([...otherScores, ...updatedThisMapelScores]);
         setToastMsg(`Berhasil! Seluruh data nilai ${updatedThisMapelScores.length} siswa Kelas ${currentKelas?.nama || ''} telah tersimpan.`);
+        setHasUnsavedChanges(false);
       }
 
       setIsSavedToast(true);

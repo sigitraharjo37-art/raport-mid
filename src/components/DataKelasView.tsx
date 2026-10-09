@@ -283,8 +283,17 @@ export const DataKelasView: React.FC<DataKelasViewProps> = ({
 
                 <div className="mt-4 pt-3 border-t border-slate-100">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Wali Kelas</p>
-                  <p className="text-sm font-semibold text-slate-800 mt-0.5">{k.waliKelas || '-'}</p>
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">NIP. {k.nipWaliKelas || '-'}</p>
+                  {(() => {
+                    const matched = sortedGuruList.find((g) => g.nama === k.waliKelas || (k.nipWaliKelas && k.nipWaliKelas !== '-' && g.nip === k.nipWaliKelas));
+                    const wNama = matched ? matched.nama : (k.waliKelas || '-');
+                    const wNip = matched ? matched.nip : (k.nipWaliKelas || '-');
+                    return (
+                      <>
+                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{wNama}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">NIP. {wNip}</p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

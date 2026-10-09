@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SchoolInfo, AuthUser } from '../types/rapor';
-import { School, Settings, RotateCcw, Download, Upload, CheckCircle2, AlertCircle, LogOut, User } from 'lucide-react';
+import { School, Settings, RotateCcw, Download, Upload, CheckCircle2, AlertCircle, LogOut, User, RefreshCw } from 'lucide-react';
 
 interface HeaderNavProps {
   schoolInfo: SchoolInfo;
@@ -10,6 +10,8 @@ interface HeaderNavProps {
   onResetData: () => void;
   onExportJson: () => void;
   onImportJson: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRefreshCloud?: () => Promise<void> | void;
+  isRefreshingCloud?: boolean;
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
@@ -20,6 +22,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   onResetData,
   onExportJson,
   onImportJson,
+  onRefreshCloud,
+  isRefreshingCloud = false,
 }) => {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
@@ -38,9 +42,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
                 <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   {schoolInfo.kurikulum}
                 </span>
-                <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-semibold" title="Data tersimpan di Firebase Firestore dan otomatis sinkron antar perangkat">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Cloud Sync Aktif</span>
+                <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-semibold" title="Mode hemat kuota aktif: Read saat buka/refresh halaman, Write saat tekan Simpan">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>Cloud Hemat Kuota</span>
                 </span>
               </div>
               <p className="text-xs text-slate-300 font-medium truncate max-w-xs sm:max-w-md">
@@ -51,6 +55,17 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
 
           {/* Action Buttons & User Profile */}
           <div className="flex items-center space-x-2">
+            {onRefreshCloud && (
+              <button
+                onClick={onRefreshCloud}
+                disabled={isRefreshingCloud}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition disabled:opacity-50"
+                title="Muat ulang data terbaru dari Cloud Database"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${isRefreshingCloud ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">Sinkron Cloud</span>
+              </button>
+            )}
             {currentUser?.role === 'admin' && (
               <>
                 <button

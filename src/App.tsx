@@ -36,6 +36,7 @@ import {
 } from './utils/storage';
 import {
   initializeCloudDatabase,
+  fetchCloudDataOnce,
   subscribeToRealtimeCloudData,
   saveSchoolInfoCloud,
   saveSingleGuruCloud,
@@ -203,11 +204,58 @@ export default function App() {
     saveGurusCloud(updated);
   };
 
-  const handleUpdateGuru = (updatedG: Guru) => {
+  const handleUpdateGuru = async (updatedG: Guru) => {
+    const oldGuru = guruList.find((g) => g.id === updatedG.id);
     const updated = guruList.map((g) => (g.id === updatedG.id ? updatedG : g));
     setGuruList(updated);
     saveGuruList(updated);
-    saveSingleGuruCloud(updatedG);
+    await saveSingleGuruCloud(updatedG);
+
+    if (oldGuru) {
+      // 1. Otomatis perbarui Wali Kelas di semua kelas yang ditugaskan kepada guru ini
+      let isKelasChanged = false;
+      const updatedKelasList = kelasList.map((k) => {
+        const isMatch =
+          k.waliKelas === oldGuru.nama ||
+          (oldGuru.nip && oldGuru.nip !== '-' && k.nipWaliKelas === oldGuru.nip);
+        if (isMatch) {
+          isKelasChanged = true;
+          const updatedK: Kelas = {
+            ...k,
+            waliKelas: updatedG.nama,
+            nipWaliKelas: updatedG.nip,
+          };
+          saveSingleKelasCloud(updatedK); // 1 write per affected class
+          return updatedK;
+        }
+        return k;
+      });
+
+      if (isKelasChanged) {
+        setKelasList(updatedKelasList);
+        saveKelasList(updatedKelasList);
+      }
+
+      // 2. Otomatis perbarui Guru Pengampu di konfigurasi mapel
+      let isConfigChanged = false;
+      const updatedConfigs = subjectConfigs.map((c) => {
+        if (c.namaGuru === oldGuru.nama) {
+          isConfigChanged = true;
+          const updatedC: SubjectConfig = {
+            ...c,
+            namaGuru: updatedG.nama,
+          };
+          saveSingleSubjectConfigCloud(updatedC);
+          return updatedC;
+        }
+        return c;
+      });
+
+      if (isConfigChanged) {
+        setSubjectConfigs(updatedConfigs);
+        saveSubjectConfigs(updatedConfigs);
+      }
+    }
   };
 
   const handleDeleteGuru = (id: string) => {
@@ -526,6 +574,22 @@ export default function App() {
     e.target.value = '';
   };
 
+  const [isRefreshingCloud, setIsRefreshingCloud] = useState(false);
+  const handleRefreshCloud = async () => {
+    setIsRefreshingCloud(true);
+    await fetchCloudDataOnce((cloudData) => {
+      if (cloudData.schoolInfo) setSchoolInfo(cloudData.schoolInfo);
+      if (cloudData.gurus) setGuruList(cloudData.gurus);
+      if (cloudData.kelas) setKelasList(cloudData.kelas);
+      if (cloudData.mapel) setMapelList(cloudData.mapel);
+      if (cloudData.siswa) setSiswaList(cloudData.siswa);
+      if (cloudData.configs) setSubjectConfigs(cloudData.configs);
+      if (cloudData.scores) setScoresList(cloudData.scores);
+      if (cloudData.presensi) setPresensiList(cloudData.presensi);
+    });
+    setIsRefreshingCloud(false);
+  };
+
   // If not logged in, show LoginPage
   if (!currentUser) {
     return (
@@ -548,6 +612,8 @@ export default function App() {
         onResetData={handleResetData}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
+        onRefreshCloud={handleRefreshCloud}
+        isRefreshingCloud={isRefreshingCloud}
       />
 
       <div className="flex-1 flex flex-col md:flex-row">
@@ -594,6 +660,7 @@ export default function App() {
           {activeTab === 'legger' && (
             <LeggerView
               schoolInfo={schoolInfo}
+              guruList={guruList}
               kelasList={kelasList}
               selectedKelasId={selectedKelasId}
               onSelectKelas={setSelectedKelasId}
@@ -607,6 +674,7 @@ export default function App() {
           {activeTab === 'rapor' && (
             <RaporPrintView
               schoolInfo={schoolInfo}
+              guruList={guruList}
               kelasList={kelasList}
               selectedKelasId={selectedKelasId}
               onSelectKelas={setSelectedKelasId}

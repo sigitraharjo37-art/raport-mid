@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SchoolInfo, Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, PresensiCatatan, LegerRow } from '../types/rapor';
+import { SchoolInfo, Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, PresensiCatatan, LegerRow, Guru } from '../types/rapor';
 import { calculateLegger } from '../utils/storage';
 import {
   Printer,
@@ -18,6 +18,7 @@ import * as XLSX from 'xlsx';
 
 interface RaporPrintViewProps {
   schoolInfo: SchoolInfo;
+  guruList?: Guru[];
   kelasList: Kelas[];
   selectedKelasId: string;
   onSelectKelas: (kelasId: string) => void;
@@ -30,6 +31,7 @@ interface RaporPrintViewProps {
 
 export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
   schoolInfo,
+  guruList = [],
   kelasList,
   selectedKelasId,
   onSelectKelas,
@@ -43,6 +45,15 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
   const currentSiswaList = siswaList
     .filter((s) => s.kelasId === selectedKelasId)
     .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+
+  // Live dynamic resolution of Wali Kelas from guruList if data guru was edited
+  const matchedWaliKelas = guruList.find(
+    (g) =>
+      g.nama === currentKelas?.waliKelas ||
+      (currentKelas?.nipWaliKelas && currentKelas.nipWaliKelas !== '-' && g.nip === currentKelas.nipWaliKelas)
+  );
+  const activeWaliKelasNama = matchedWaliKelas ? matchedWaliKelas.nama : (currentKelas?.waliKelas || '-');
+  const activeWaliKelasNip = matchedWaliKelas ? matchedWaliKelas.nip : (currentKelas?.nipWaliKelas || '-');
   const sortedMapel = [...mapelList].sort((a, b) => a.urutan - b.urutan);
 
   const [selectedSiswaId, setSelectedSiswaId] = useState<string>(currentSiswaList[0]?.id || '');
@@ -306,11 +317,15 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
                     </td>
                     <td className="border border-black py-1.5 px-2">
                       <div className="font-bold">{mapel.nama}</div>
-                      {showTeacherOnReport && cfg?.namaGuru && (
-                        <div className="text-[10px] text-slate-600 italic">
-                          Guru: {cfg.namaGuru}
-                        </div>
-                      )}
+                      {showTeacherOnReport && cfg?.namaGuru && (() => {
+                        const matchedGuruPengampu = guruList.find((g) => g.nama === cfg.namaGuru);
+                        const teacherName = matchedGuruPengampu ? matchedGuruPengampu.nama : cfg.namaGuru;
+                        return (
+                          <div className="text-[10px] text-slate-600 italic">
+                            Guru: {teacherName}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="border border-black py-1.5 px-1 text-center font-mono">
                       {kktpVal}
@@ -509,8 +524,8 @@ export const RaporPrintView: React.FC<RaporPrintViewProps> = ({
               <p>Wali Kelas,</p>
               <p className="font-semibold">Kelas {currentKelas.nama}</p>
               <div className="h-16"></div>
-              <p className="font-bold underline">{currentKelas.waliKelas}</p>
-              <p className="text-[10px]">NIP. {currentKelas.nipWaliKelas || '-'}</p>
+              <p className="font-bold underline">{activeWaliKelasNama}</p>
+              <p className="text-[10px]">NIP. {activeWaliKelasNip || '-'}</p>
             </div>
           </div>
         </div>

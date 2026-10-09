@@ -135,10 +135,12 @@ export async function syncAllToCloud(data: {
 }
 
 /**
- * Subscribes to Real-Time Updates from Cloud Database.
- * When an item is deleted or added on any device, this immediately fires with the accurate updated list!
+ * Mode Super Hemat Kuota Firestore (Ultra-Economical Mode):
+ * 1. Read Cloud Firestore hanya saat baru membuka halaman atau me-refresh halaman (atau tombol sinkron manual).
+ * 2. Tidak menggunakan continuous onSnapshot listeners latar belakang agar tidak menguras kuota 50.000 read/hari dan mencegah LOOP.
+ * 3. Write ke Cloud Firestore hanya saat user menekan tombol 'Simpan'.
  */
-export function subscribeToRealtimeCloudData(
+export async function fetchCloudDataOnce(
   onDataLoaded: (data: {
     schoolInfo?: SchoolInfo;
     gurus?: Guru[];
@@ -150,96 +152,74 @@ export function subscribeToRealtimeCloudData(
     presensi?: PresensiCatatan[];
   }) => void,
   onError?: (err: Error) => void
-) {
-  const unsubscribers: (() => void)[] = [];
-
+): Promise<{ success: boolean; isQuotaExceeded?: boolean; error?: string }> {
   try {
-    // 1. School Info Listener
-    const unsubSchool = onSnapshot(
-      doc(db, 'schoolInfo', 'main'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites) return;
-        if (snapshot.exists()) {
-          const info = snapshot.data() as SchoolInfo;
-          saveSchoolInfo(info);
-          onDataLoaded({ schoolInfo: info });
-        }
-      },
-      onError
-    );
-    unsubscribers.push(unsubSchool);
+    // 1. School Info (1 read)
+    try {
+      const schoolSnap = await getDoc(doc(db, 'schoolInfo', 'main'));
+      if (schoolSnap.exists()) {
+        const info = schoolSnap.data() as SchoolInfo;
+        saveSchoolInfo(info);
+        onDataLoaded({ schoolInfo: info });
+      }
+    } catch (e: any) {
+      console.warn('School info fetch notice (local preserved):', e);
+    }
 
-    // 2. Gurus Listener (Syncs additions, edits, and deletions without write loops)
-    const unsubGurus = onSnapshot(
-      collection(db, 'gurus'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-        const list = snapshot.docs.map((d) => d.data() as Guru);
+    // 2. Gurus
+    try {
+      const gurusSnap = await getDocs(collection(db, 'gurus'));
+      if (!gurusSnap.empty) {
+        const list = gurusSnap.docs.map((d) => d.data() as Guru);
         saveGuruList(list);
         onDataLoaded({ gurus: list });
-      },
-      (err) => {
-        console.warn('Realtime gurus sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubGurus);
+    } catch (e: any) {
+      console.warn('Gurus fetch notice (local preserved):', e);
+    }
 
-    // 3. Kelas Listener
-    const unsubKelas = onSnapshot(
-      collection(db, 'kelas'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-        const list = snapshot.docs.map((d) => d.data() as Kelas);
+    // 3. Kelas
+    try {
+      const kelasSnap = await getDocs(collection(db, 'kelas'));
+      if (!kelasSnap.empty) {
+        const list = kelasSnap.docs.map((d) => d.data() as Kelas);
         saveKelasList(list);
         onDataLoaded({ kelas: list });
-      },
-      (err) => {
-        console.warn('Realtime kelas sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubKelas);
+    } catch (e: any) {
+      console.warn('Kelas fetch notice (local preserved):', e);
+    }
 
-    // 4. Mapel Listener (Syncs additions, edits, and deletions)
-    const unsubMapel = onSnapshot(
-      collection(db, 'mapel'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-        const list = snapshot.docs.map((d) => d.data() as MataPelajaran);
+    // 4. Mapel (Urutkan berdasarkan urutan) - 1 doc per mapel
+    try {
+      const mapelSnap = await getDocs(collection(db, 'mapel'));
+      if (!mapelSnap.empty) {
+        const list = mapelSnap.docs.map((d) => d.data() as MataPelajaran);
         list.sort((a, b) => a.urutan - b.urutan);
         saveMapelList(list);
         onDataLoaded({ mapel: list });
-      },
-      (err) => {
-        console.warn('Realtime mapel sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubMapel);
+    } catch (e: any) {
+      console.warn('Mapel fetch notice (local preserved):', e);
+    }
 
-    // 5. Siswa Listener (Syncs additions, edits, and deletions)
-    const unsubSiswa = onSnapshot(
-      collection(db, 'siswa'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-        const list = snapshot.docs.map((d) => d.data() as Siswa);
+    // 5. Siswa
+    try {
+      const siswaSnap = await getDocs(collection(db, 'siswa'));
+      if (!siswaSnap.empty) {
+        const list = siswaSnap.docs.map((d) => d.data() as Siswa);
         saveSiswaList(list);
         onDataLoaded({ siswa: list });
-      },
-      (err) => {
-        console.warn('Realtime siswa sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubSiswa);
+    } catch (e: any) {
+      console.warn('Siswa fetch notice (local preserved):', e);
+    }
 
-    // 6. Subject Configs Listener
-    const unsubConfigs = onSnapshot(
-      collection(db, 'subjectConfigs'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-        const cloudConfigs = snapshot.docs.map((d) => d.data() as SubjectConfig);
+    // 6. Subject Configs
+    try {
+      const configsSnap = await getDocs(collection(db, 'subjectConfigs'));
+      if (!configsSnap.empty) {
+        const cloudConfigs = configsSnap.docs.map((d) => d.data() as SubjectConfig);
         const localConfigs = loadSubjectConfigs();
         const confMap = new Map<string, SubjectConfig>();
         localConfigs.forEach((c) => confMap.set(`${c.kelasId}_${c.mapelId}`, c));
@@ -247,38 +227,30 @@ export function subscribeToRealtimeCloudData(
         const mergedConfigs = Array.from(confMap.values());
         saveSubjectConfigs(mergedConfigs);
         onDataLoaded({ configs: mergedConfigs });
-      },
-      (err) => {
-        console.warn('Realtime configs sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubConfigs);
+    } catch (e: any) {
+      console.warn('Configs fetch notice (local preserved):', e);
+    }
 
-    // 7. Scores Listener (Reads both 1-write class documents and legacy single records, merges cleanly)
-    const unsubScores = onSnapshot(
-      collection(db, 'scores'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-
+    // 7. Scores (Mendukung format hemat 1-write per kelas-mapel dan legacy single records)
+    try {
+      const scoresSnap = await getDocs(collection(db, 'scores'));
+      if (!scoresSnap.empty) {
         const incomingScores: NilaiRecord[] = [];
         const incomingConfigs: SubjectConfig[] = [];
 
-        snapshot.docs.forEach((d) => {
+        scoresSnap.docs.forEach((d) => {
           const data = d.data();
           if (Array.isArray(data.scores)) {
-            // New format: 1 write per class-mapel containing all student scores
             incomingScores.push(...data.scores);
             if (data.config) {
               incomingConfigs.push(data.config as SubjectConfig);
             }
           } else if (data.siswaId && data.mapelId) {
-            // Legacy single record format
             incomingScores.push({ id: d.id, ...data } as NilaiRecord);
           }
         });
 
-        // Merge incoming scores with local scores
         const localScores = loadScores();
         const scoreMap = new Map<string, NilaiRecord>();
         localScores.forEach((sc) => {
@@ -290,7 +262,6 @@ export function subscribeToRealtimeCloudData(
         const mergedScores = Array.from(scoreMap.values());
         saveScores(mergedScores);
 
-        // Also merge any bundled subject configs
         if (incomingConfigs.length > 0) {
           const localConfigs = loadSubjectConfigs();
           const confMap = new Map<string, SubjectConfig>();
@@ -302,22 +273,17 @@ export function subscribeToRealtimeCloudData(
         } else {
           onDataLoaded({ scores: mergedScores });
         }
-      },
-      (err) => {
-        console.warn('Realtime scores sync warning (using local scores):', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubScores);
+    } catch (e: any) {
+      console.warn('Scores fetch notice (local preserved):', e);
+    }
 
-    // 8. Presensi Listener (Reads both 1-write class documents and legacy single records)
-    const unsubPresensi = onSnapshot(
-      collection(db, 'presensi'),
-      (snapshot) => {
-        if (snapshot.metadata.hasPendingWrites || snapshot.empty) return;
-
+    // 8. Presensi
+    try {
+      const presensiSnap = await getDocs(collection(db, 'presensi'));
+      if (!presensiSnap.empty) {
         const incomingPresensi: PresensiCatatan[] = [];
-        snapshot.docs.forEach((d) => {
+        presensiSnap.docs.forEach((d) => {
           const data = d.data();
           if (Array.isArray(data.records)) {
             incomingPresensi.push(...data.records);
@@ -333,20 +299,49 @@ export function subscribeToRealtimeCloudData(
         const mergedPresensi = Array.from(presensiMap.values());
         savePresensi(mergedPresensi);
         onDataLoaded({ presensi: mergedPresensi });
-      },
-      (err) => {
-        console.warn('Realtime presensi sync warning:', err);
-        if (onError) onError(err);
       }
-    );
-    unsubscribers.push(unsubPresensi);
-  } catch (err: any) {
-    if (onError) onError(err);
-  }
+    } catch (e: any) {
+      console.warn('Presensi fetch notice (local preserved):', e);
+    }
 
-  return () => {
-    unsubscribers.forEach((u) => u());
-  };
+    return { success: true };
+  } catch (err: any) {
+    const isQuota =
+      err?.message?.includes('RESOURCE_EXHAUSTED') ||
+      err?.code === 'resource-exhausted';
+    if (onError) onError(err);
+    return {
+      success: false,
+      isQuotaExceeded: isQuota,
+      error: isQuota
+        ? 'Batas kuota harian Firebase Firestore tercapai. Mode hemat lokal aktif.'
+        : err?.message,
+    };
+  }
+}
+
+/**
+ * Subscribes or fetches initial Cloud data on page open/refresh.
+ * Runs only once per mount/refresh to preserve the 50.000 daily read quota and prevent any write-read loops.
+ */
+export function subscribeToRealtimeCloudData(
+  onDataLoaded: (data: {
+    schoolInfo?: SchoolInfo;
+    gurus?: Guru[];
+    kelas?: Kelas[];
+    mapel?: MataPelajaran[];
+    siswa?: Siswa[];
+    configs?: SubjectConfig[];
+    scores?: NilaiRecord[];
+    presensi?: PresensiCatatan[];
+  }) => void,
+  onError?: (err: Error) => void
+) {
+  // Execute single read on page open / refresh
+  fetchCloudDataOnce(onDataLoaded, onError);
+
+  // Return harmless cleanup function
+  return () => {};
 }
 
 // ==================== SAAVERS (CREATE & UPDATE) ====================

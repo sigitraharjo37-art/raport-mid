@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SchoolInfo, Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, LegerRow } from '../types/rapor';
+import { SchoolInfo, Kelas, MataPelajaran, Siswa, SubjectConfig, NilaiRecord, LegerRow, Guru } from '../types/rapor';
 import { calculateLegger } from '../utils/storage';
 import { exportLeggerToExcel } from '../utils/excelExport';
 import {
@@ -18,6 +18,7 @@ import confetti from 'canvas-confetti';
 
 interface LeggerViewProps {
   schoolInfo: SchoolInfo;
+  guruList?: Guru[];
   kelasList: Kelas[];
   selectedKelasId: string;
   onSelectKelas: (kelasId: string) => void;
@@ -29,6 +30,7 @@ interface LeggerViewProps {
 
 export const LeggerView: React.FC<LeggerViewProps> = ({
   schoolInfo,
+  guruList = [],
   kelasList,
   selectedKelasId,
   onSelectKelas,
@@ -43,6 +45,15 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
 
   const currentKelas = kelasList.find((k) => k.id === selectedKelasId) || kelasList[0];
   const sortedMapel = [...mapelList].sort((a, b) => a.urutan - b.urutan);
+
+  // Live dynamic resolution of Wali Kelas from guruList if data guru was edited
+  const matchedWaliKelas = guruList.find(
+    (g) =>
+      g.nama === currentKelas?.waliKelas ||
+      (currentKelas?.nipWaliKelas && currentKelas.nipWaliKelas !== '-' && g.nip === currentKelas.nipWaliKelas)
+  );
+  const activeWaliKelasNama = matchedWaliKelas ? matchedWaliKelas.nama : (currentKelas?.waliKelas || '-');
+  const activeWaliKelasNip = matchedWaliKelas ? matchedWaliKelas.nip : (currentKelas?.nipWaliKelas || '-');
 
   // Compute calculated leger rows (totals, averages, and ranks)
   const rawLegerRows = calculateLegger(
@@ -183,11 +194,15 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
                 onChange={(e) => onSelectKelas(e.target.value)}
                 className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-indigo-700 shadow-xs focus:ring-2 focus:ring-indigo-500"
               >
-                {kelasList.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    Kelas {k.nama} ({k.waliKelas})
-                  </option>
-                ))}
+                {kelasList.map((k) => {
+                  const mGuru = guruList.find((g) => g.nama === k.waliKelas || (k.nipWaliKelas && k.nipWaliKelas !== '-' && g.nip === k.nipWaliKelas));
+                  const wNama = mGuru ? mGuru.nama : k.waliKelas;
+                  return (
+                    <option key={k.id} value={k.id}>
+                      Kelas {k.nama} ({wNama})
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -351,6 +366,7 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
             </h4>
             <p className="text-[11px]">
               Tahun Ajaran {schoolInfo.tahunAjaran} • Semester {schoolInfo.semester} • Kurikulum {schoolInfo.kurikulum}
+              {schoolInfo.website && ` • Web: ${schoolInfo.website}`}
             </p>
           </div>
           <div className="w-16 h-16 flex items-center justify-center shrink-0">
@@ -361,7 +377,7 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
         </div>
         <div className="flex justify-between text-xs mt-2 pt-1 border-t border-dotted font-medium">
           <span>Kelas: <strong>{currentKelas?.nama}</strong></span>
-          <span>Wali Kelas: <strong>{currentKelas?.waliKelas}</strong> (NIP. {currentKelas?.nipWaliKelas})</span>
+          <span>Wali Kelas: <strong>{activeWaliKelasNama}</strong> (NIP. {activeWaliKelasNip || '-'})</span>
           <span>Dicetak: {schoolInfo.tempatTanggalRapor}</span>
         </div>
       </div>
@@ -605,8 +621,8 @@ export const LeggerView: React.FC<LeggerViewProps> = ({
             <p>{schoolInfo.tempatTanggalRapor}</p>
             <p className="font-bold">Wali Kelas {currentKelas?.nama}</p>
             <div className="h-16"></div>
-            <p className="font-bold underline">{currentKelas?.waliKelas}</p>
-            <p>NIP. {currentKelas?.nipWaliKelas}</p>
+            <p className="font-bold underline">{activeWaliKelasNama}</p>
+            <p>NIP. {activeWaliKelasNip || '-'}</p>
           </div>
         </div>
       </div>
