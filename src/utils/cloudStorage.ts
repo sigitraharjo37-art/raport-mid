@@ -86,11 +86,23 @@ export async function initializeCloudDatabase(): Promise<boolean> {
 }
 
 function cleanDocForFirestore<T extends Record<string, any>>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === 'object' && item !== null ? cleanDocForFirestore(item) : item)) as any;
+  }
   const result: any = {};
   Object.keys(obj).forEach((key) => {
     const val = obj[key];
     if (val !== undefined && !(typeof val === 'number' && Number.isNaN(val))) {
-      result[key] = val;
+      if (typeof val === 'object' && val !== null) {
+        result[key] = cleanDocForFirestore(val);
+      } else {
+        result[key] = val;
+      }
     }
   });
   return result;
